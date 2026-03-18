@@ -4,7 +4,7 @@
  * Detects Dockerfile template based on project contents.
  */
 export class DeployService {
-  /** @throws {Error} Stub — not yet implemented. */
+  /** @throws Stub — not yet implemented. */
   deploy(): never {
     throw new Error("DeployService.deploy not yet implemented.");
   }

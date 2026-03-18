@@ -5,7 +5,7 @@
  * output back via WebSocket.
  */
 export class BuildRunner {
-  /** @throws {Error} Stub — not yet implemented. */
+  /** @throws Stub — not yet implemented. */
   start(): never {
     throw new Error("BuildRunner.start not yet implemented.");
   }

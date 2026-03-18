@@ -15,12 +15,12 @@ export type AppConfig = z.infer<typeof configSchema>;
 
 /**
  * Loads and validates application configuration from environment variables.
- * @throws {ZodError} if required variables are missing or malformed.
+ * @throws ZodError if required variables are missing or malformed.
  */
 export function loadConfig(): AppConfig {
   return configSchema.parse({
     port: process.env["PORT"],
-    nodeEnv: process.env["NODE_ENV"],
+    nodeEnv: process.env.NODE_ENV,
     databaseUrl: process.env["DATABASE_URL"],
     redisUrl: process.env["REDIS_URL"],
     giteaUrl: process.env["GITEA_URL"],

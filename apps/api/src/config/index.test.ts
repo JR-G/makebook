@@ -29,11 +29,11 @@ describe("loadConfig", () => {
     const config = loadConfig();
     expect(config.port).toBe(3000);
     expect(config.nodeEnv).toBe("development");
-    expect(config.databaseUrl).toBe(validEnv["DATABASE_URL"]);
-    expect(config.redisUrl).toBe(validEnv["REDIS_URL"]);
-    expect(config.giteaUrl).toBe(validEnv["GITEA_URL"]);
-    expect(config.giteaAdminToken).toBe(validEnv["GITEA_ADMIN_TOKEN"]);
-    expect(config.jwtSecret).toBe(validEnv["JWT_SECRET"]);
+    expect(config.databaseUrl).toBe(validEnv.DATABASE_URL);
+    expect(config.redisUrl).toBe(validEnv.REDIS_URL);
+    expect(config.giteaUrl).toBe(validEnv.GITEA_URL);
+    expect(config.giteaAdminToken).toBe(validEnv.GITEA_ADMIN_TOKEN);
+    expect(config.jwtSecret).toBe(validEnv.JWT_SECRET);
   });
 
   test("defaults port to 3000 when not provided", () => {
@@ -43,7 +43,7 @@ describe("loadConfig", () => {
   });
 
   test("defaults nodeEnv to development when not provided", () => {
-    delete process.env["NODE_ENV"];
+    delete process.env.NODE_ENV;
     const config = loadConfig();
     expect(config.nodeEnv).toBe("development");
   });
@@ -79,7 +79,7 @@ describe("loadConfig", () => {
   });
 
   test("throws on invalid NODE_ENV value", () => {
-    process.env["NODE_ENV"] = "invalid-env";
+    process.env.NODE_ENV = "invalid-env";
     expect(() => loadConfig()).toThrow();
   });
 

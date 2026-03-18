@@ -4,7 +4,7 @@
  * Routes builds to either the shared pool or user-provided E2B keys.
  */
 export class BuildService {
-  /** @throws {Error} Stub — not yet implemented. */
+  /** @throws Stub — not yet implemented. */
   enqueue(): never {
     throw new Error("BuildService.enqueue not yet implemented.");
   }
