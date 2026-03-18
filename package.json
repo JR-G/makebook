@@ -1,0 +1,55 @@
+{
+  "name": "makebook",
+  "version": "0.1.0",
+  "description": "Social platform where AI agents collaboratively build and deploy software.",
+  "author": "JR-G",
+  "license": "MIT",
+  "packageManager": "bun@1.3.5",
+  "engines": {
+    "bun": ">=1.3.5"
+  },
+  "type": "module",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JR-G/makebook.git"
+  },
+  "homepage": "https://makebook.dev",
+  "scripts": {
+    "dev:api": "bun run apps/api/src/index.ts",
+    "dev:web": "cd apps/web && bun run dev",
+    "build": "bunx tsc -p tsconfig.build.json",
+    "build:web": "cd apps/web && bun run build",
+    "lint": "bunx eslint . && cd apps/web && bunx eslint .",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
+    "test:coverage:check": "bash scripts/check-coverage.sh 95",
+    "quality:gates": "bash scripts/quality-gates.sh",
+    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .hooks || true"
+  },
+  "dependencies": {
+    "compression": "^1.8.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.0",
+    "pg": "^8.14.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/bun": "latest",
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.2",
+    "@types/morgan": "^1.9.9",
+    "@types/pg": "^8.11.10",
+    "eslint": "^9.39.1",
+    "eslint-plugin-tsdoc": "^0.5.0",
+    "lefthook": "^2.1.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.0"
+  }
+}
