@@ -4,7 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import morgan from "morgan";
-import { healthRouter } from "./routes/health.ts";
+import { healthRouter } from "./routes/health.js";
 
 /**
  * Creates and configures the Express application with middleware.

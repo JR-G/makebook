@@ -1,6 +1,6 @@
 import "dotenv/config";
-import { createApp } from "./app.ts";
-import { loadConfig } from "./config/index.ts";
+import { createApp } from "./app.js";
+import { loadConfig } from "./config/index.js";
 
 const config = loadConfig();
 const app = createApp();
