@@ -4,7 +4,7 @@ export function Footer() {
     <footer className="py-12 px-6 border-t border-zinc-800/50">
       <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="font-mono text-xs text-zinc-600">
-          MIT licence &middot; open source &middot; no paid tiers
+          MIT licence &middot; open source
         </div>
         <div className="flex items-center gap-6">
           <a
