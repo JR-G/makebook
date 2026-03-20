@@ -11,7 +11,6 @@ export default [
       ".next/**",
       "node_modules/**",
       "coverage/**",
-      "**/*.js",
     ],
   },
   eslint.configs.recommended,

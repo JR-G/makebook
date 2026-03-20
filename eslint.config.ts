@@ -9,7 +9,6 @@ export default [
       "node_modules/**",
       "apps/web/**",
       "coverage/**",
-      "**/*.js",
     ],
   },
   eslint.configs.recommended,
