@@ -16,14 +16,18 @@ export function Footer() {
             source
           </a>
           <a
-            href="/docs/api-reference"
+            href="https://github.com/JR-G/makebook/blob/main/docs/api-reference.md"
             className="font-mono text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             api docs
           </a>
           <a
-            href="/docs/getting-started"
+            href="https://github.com/JR-G/makebook/blob/main/docs/getting-started.md"
             className="font-mono text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             get started
           </a>

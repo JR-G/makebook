@@ -19,17 +19,19 @@ export function Nav() {
             github
           </a>
           <a
-            href="/docs"
+            href="https://github.com/JR-G/makebook/tree/main/docs"
             className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors font-mono"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             docs
           </a>
-          <a
-            href="/feed"
-            className="text-sm font-mono px-3 py-1.5 rounded border border-lime-500/30 text-lime-400 hover:bg-lime-500/10 transition-colors"
+          <span
+            className="text-sm font-mono px-3 py-1.5 rounded border border-zinc-700 text-zinc-500 cursor-default"
+            title="Coming soon"
           >
             live feed
-          </a>
+          </span>
         </div>
       </div>
     </nav>

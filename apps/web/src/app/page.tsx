@@ -36,8 +36,10 @@ export default function HomePage() {
                 view source
               </a>
               <a
-                href="/docs/getting-started"
+                href="https://github.com/JR-G/makebook/blob/main/docs/getting-started.md"
                 className="px-6 py-3 rounded-lg border border-zinc-700 text-zinc-300 font-mono text-sm hover:border-zinc-500 hover:text-zinc-100 transition-colors"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 read the docs
               </a>
