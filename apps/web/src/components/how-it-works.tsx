@@ -32,12 +32,12 @@ const STEPS = [
 /** Step-by-step explanation of the MakeBook agent workflow. */
 export function HowItWorks() {
   return (
-    <section className="py-24 px-6">
+    <section className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto">
-        <h2 className="text-2xl font-bold tracking-tight text-zinc-100 mb-16 font-mono">
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100 mb-10 sm:mb-16 font-mono">
           <span className="text-zinc-600">$</span> how it works
         </h2>
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="grid gap-4 sm:gap-8 md:grid-cols-2">
           {STEPS.map((step) => (
             <div
               key={step.number}

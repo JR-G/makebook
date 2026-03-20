@@ -86,13 +86,13 @@ export function TerminalFeed() {
           <div className="size-3 rounded-full bg-red-500/80" />
           <div className="size-3 rounded-full bg-amber-500/80" />
           <div className="size-3 rounded-full bg-emerald-500/80" />
-          <span className="ml-3 text-xs font-mono text-zinc-500">live feed — makebook.dev</span>
+          <span className="ml-3 text-xs font-mono text-zinc-500 hidden sm:inline">live feed — makebook.dev</span>
           <span className="ml-auto flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-lime-500 animate-pulse" />
             <span className="text-xs font-mono text-lime-500/70">live</span>
           </span>
         </div>
-        <div ref={containerRef} className="p-4 h-80 overflow-y-auto font-mono text-sm space-y-1.5 scrollbar-hide">
+        <div ref={containerRef} className="p-3 sm:p-4 h-64 sm:h-80 overflow-y-auto overflow-x-hidden font-mono text-xs sm:text-sm space-y-1.5 scrollbar-hide">
           {lines.length === 0 && (
             <div className="text-zinc-600 animate-pulse">waiting for agent activity...</div>
           )}
@@ -101,7 +101,7 @@ export function TerminalFeed() {
               key={`${line.timestamp}-${line.agent}-${line.target}`}
               className="flex items-start gap-2 animate-in fade-in slide-in-from-bottom-1 duration-300"
             >
-              <span className="text-zinc-600 shrink-0">{line.timestamp}</span>
+              <span className="text-zinc-600 shrink-0 hidden sm:inline">{line.timestamp}</span>
               <span className={`shrink-0 w-4 text-center ${TYPE_COLOURS[line.type]}`}>
                 {TYPE_SYMBOLS[line.type]}
               </span>

@@ -9,10 +9,10 @@ export function Nav() {
           </span>
           <span className="text-xs font-mono text-zinc-600 hidden sm:inline">v0.1.0</span>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <a
             href="https://github.com/JR-G/makebook"
-            className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors font-mono"
+            className="text-xs sm:text-sm text-zinc-400 hover:text-zinc-100 transition-colors font-mono"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -20,14 +20,14 @@ export function Nav() {
           </a>
           <a
             href="https://github.com/JR-G/makebook/tree/main/docs"
-            className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors font-mono"
+            className="text-xs sm:text-sm text-zinc-400 hover:text-zinc-100 transition-colors font-mono hidden sm:inline"
             target="_blank"
             rel="noopener noreferrer"
           >
             docs
           </a>
           <span
-            className="text-sm font-mono px-3 py-1.5 rounded border border-zinc-700 text-zinc-500 cursor-default"
+            className="text-xs sm:text-sm font-mono px-2 sm:px-3 py-1 sm:py-1.5 rounded border border-zinc-700 text-zinc-500 cursor-default hidden sm:inline-block"
             title="Coming soon"
           >
             live feed
