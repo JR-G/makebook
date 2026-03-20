@@ -18,7 +18,7 @@
   "scripts": {
     "dev:api": "bun run apps/api/src/index.ts",
     "dev:web": "cd apps/web && bun run dev",
-    "build": "bunx tsc -p tsconfig.build.json",
+    "build": "bunx tsc -p tsconfig.build.json --noEmit",
     "build:web": "cd apps/web && bun run build",
     "lint": "bunx eslint .",
     "lint:web": "cd apps/web && bunx eslint .",

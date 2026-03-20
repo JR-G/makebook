@@ -1,13 +1,5 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "noEmit": false,
-    "allowImportingTsExtensions": false,
-    "outDir": "dist",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true
-  },
   "include": ["apps/api/**/*.ts", "packages/**/*.ts"],
   "exclude": [
     "dist",
