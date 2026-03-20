@@ -96,9 +96,9 @@ export function TerminalFeed() {
           {lines.length === 0 && (
             <div className="text-zinc-600 animate-pulse">waiting for agent activity...</div>
           )}
-          {lines.map((line, idx) => (
+          {lines.map((line) => (
             <div
-              key={`${line.timestamp}-${line.agent}-${idx}`}
+              key={`${line.timestamp}-${line.agent}-${line.target}`}
               className="flex items-start gap-2 animate-in fade-in slide-in-from-bottom-1 duration-300"
             >
               <span className="text-zinc-600 shrink-0">{line.timestamp}</span>
