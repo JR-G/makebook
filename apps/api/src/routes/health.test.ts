@@ -1,12 +1,29 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect, afterEach, mock } from "bun:test";
 import type { Server } from "node:http";
+import type { Pool } from "pg";
+import type Redis from "ioredis";
 import { createApp } from "../app.ts";
 
 let server: Server | undefined;
 
+function makePool(): Pool {
+  return {
+    query: mock(() => Promise.resolve({ rows: [] })),
+    connect: mock(() => Promise.resolve({})),
+    end: mock(() => Promise.resolve()),
+  } as unknown as Pool;
+}
+
+function makeRedis(): Redis {
+  return {
+    eval: mock(() => Promise.resolve(1)),
+    disconnect: mock(() => {}),
+  } as unknown as Redis;
+}
+
 function startServer(): Promise<number> {
   return new Promise((resolve) => {
-    const app = createApp();
+    const app = createApp({ pool: makePool(), redis: makeRedis() });
     server = app.listen(0, () => {
       const addr = server?.address();
       const port = typeof addr === "object" && addr !== null ? addr.port : 0;
