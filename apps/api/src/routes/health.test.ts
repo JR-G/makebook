@@ -2,6 +2,7 @@ import { describe, test, expect, afterEach, mock } from "bun:test";
 import type { Server } from "node:http";
 import type { Pool } from "pg";
 import type Redis from "ioredis";
+import type { GiteaService } from "../services/gitea.ts";
 import { createApp } from "../app.ts";
 
 let server: Server | undefined;
@@ -21,9 +22,17 @@ function makeRedis(): Redis {
   } as unknown as Redis;
 }
 
+function makeGitea(): GiteaService {
+  return {
+    createRepo: mock(() => Promise.resolve({ cloneUrl: "http://gitea/admin/test.git" })),
+    listFiles: mock(() => Promise.resolve([])),
+    getFile: mock(() => Promise.resolve(null)),
+  } as unknown as GiteaService;
+}
+
 function startServer(): Promise<number> {
   return new Promise((resolve) => {
-    const app = createApp({ pool: makePool(), redis: makeRedis() });
+    const app = createApp({ pool: makePool(), redis: makeRedis(), gitea: makeGitea() });
     server = app.listen(0, () => {
       const addr = server?.address();
       const port = typeof addr === "object" && addr !== null ? addr.port : 0;

@@ -4,17 +4,19 @@ import { loadConfig } from "./config/index.ts";
 import { createPool } from "./config/database.ts";
 import { createRedisClient } from "./config/redis.ts";
 import { runMigrations } from "./db/migrate.ts";
+import { GiteaService } from "./services/gitea.ts";
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
 const redis = createRedisClient(config.redisUrl);
+const gitea = new GiteaService(config.giteaUrl, config.giteaAdminToken);
 
 const migrationsApplied = await runMigrations(pool);
 if (migrationsApplied > 0) {
   process.stdout.write(`Applied ${migrationsApplied} database migration(s)\n`);
 }
 
-const app = createApp({ pool, redis });
+const app = createApp({ pool, redis, gitea });
 
 app.listen(config.port, () => {
   /** Startup log intentionally kept to stdout for container orchestration. */
