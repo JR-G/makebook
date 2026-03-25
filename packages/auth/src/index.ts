@@ -95,3 +95,23 @@ export function verifyApiKey(key: string, storedHash: string): VerifyResult {
 export function isApiKeyFormat(value: string): boolean {
   return value.startsWith(KEY_PREFIX) && value.length === API_KEY_LENGTH;
 }
+
+/**
+ * Extracts a MakeBook API key from an Authorization header value.
+ *
+ * @remarks
+ * Expects the header to be `Bearer mk_<64 hex chars>`.
+ * Returns `null` if the header is absent, malformed, or the token
+ * does not match the API key format — use {@link isApiKeyFormat} to
+ * check format independently.
+ *
+ * @param authHeader - The raw Authorization header string, or undefined.
+ * @returns The API key string, or `null` if absent or not an API key.
+ */
+export function extractApiKey(authHeader: string | undefined): string | null {
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+  const token = authHeader.slice("Bearer ".length);
+  return isApiKeyFormat(token) ? token : null;
+}

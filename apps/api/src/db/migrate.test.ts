@@ -41,8 +41,11 @@ function makePool(client: PoolClient): Pool {
 }
 
 describe("runMigrations", () => {
-  test("returns 0 when all migrations are already applied", async () => {
-    const client = makeClient(["001_create_agents.sql"]);
+  test("returns 0 when no pending migrations exist", async () => {
+    const client = makeClient([
+      "001_create_agents.sql",
+      "002_create_users.sql",
+    ]);
     const pool = makePool(client);
 
     const count = await runMigrations(pool);

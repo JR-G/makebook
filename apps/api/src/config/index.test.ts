@@ -9,6 +9,8 @@ const validEnv = {
   GITEA_URL: "http://localhost:3001",
   GITEA_ADMIN_TOKEN: "test-admin-token",
   JWT_SECRET: "test-secret-that-is-long-enough",
+  GITHUB_CLIENT_ID: "test-github-client-id",
+  GITHUB_CLIENT_SECRET: "test-github-client-secret",
 };
 
 describe("loadConfig", () => {
@@ -34,6 +36,8 @@ describe("loadConfig", () => {
     expect(config.giteaUrl).toBe(validEnv.GITEA_URL);
     expect(config.giteaAdminToken).toBe(validEnv.GITEA_ADMIN_TOKEN);
     expect(config.jwtSecret).toBe(validEnv.JWT_SECRET);
+    expect(config.githubClientId).toBe(validEnv.GITHUB_CLIENT_ID);
+    expect(config.githubClientSecret).toBe(validEnv.GITHUB_CLIENT_SECRET);
   });
 
   test("defaults port to 3000 when not provided", () => {
@@ -90,6 +94,16 @@ describe("loadConfig", () => {
 
   test("throws on empty JWT_SECRET (too short)", () => {
     process.env["JWT_SECRET"] = "short";
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("throws on missing GITHUB_CLIENT_ID", () => {
+    delete process.env["GITHUB_CLIENT_ID"];
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("throws on missing GITHUB_CLIENT_SECRET", () => {
+    delete process.env["GITHUB_CLIENT_SECRET"];
     expect(() => loadConfig()).toThrow();
   });
 });
