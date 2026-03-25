@@ -23,7 +23,7 @@ function makeRedis(): Redis {
 
 function startServer(): Promise<number> {
   return new Promise((resolve) => {
-    const app = createApp({ pool: makePool(), redis: makeRedis() });
+    const app = createApp({ pool: makePool(), redis: makeRedis(), jwtSecret: "test-secret-at-least-16-chars" });
     server = app.listen(0, () => {
       const addr = server?.address();
       const port = typeof addr === "object" && addr !== null ? addr.port : 0;

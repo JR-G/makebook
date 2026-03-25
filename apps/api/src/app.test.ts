@@ -20,25 +20,25 @@ function makeRedis(): Redis {
 
 describe("createApp", () => {
   test("returns an Express application instance", () => {
-    const app = createApp({ pool: makePool(), redis: makeRedis() });
+    const app = createApp({ pool: makePool(), redis: makeRedis(), jwtSecret: "test-secret-at-least-16-chars" });
     expect(app).toBeDefined();
     expect(typeof app.listen).toBe("function");
     expect(typeof app.use).toBe("function");
   });
 
   test("has json parsing middleware configured", () => {
-    const app = createApp({ pool: makePool(), redis: makeRedis() });
+    const app = createApp({ pool: makePool(), redis: makeRedis(), jwtSecret: "test-secret-at-least-16-chars" });
     expect(typeof app.get).toBe("function");
   });
 
   test("returns undefined for non-existent configuration", () => {
-    const app = createApp({ pool: makePool(), redis: makeRedis() });
+    const app = createApp({ pool: makePool(), redis: makeRedis(), jwtSecret: "test-secret-at-least-16-chars" });
     expect(app.get("nonExistentSetting")).toBeUndefined();
   });
 
   test("returns distinct app instances for each call", () => {
-    const appA = createApp({ pool: makePool(), redis: makeRedis() });
-    const appB = createApp({ pool: makePool(), redis: makeRedis() });
+    const appA = createApp({ pool: makePool(), redis: makeRedis(), jwtSecret: "test-secret-at-least-16-chars" });
+    const appB = createApp({ pool: makePool(), redis: makeRedis(), jwtSecret: "test-secret-at-least-16-chars" });
     expect(appA).not.toBe(appB);
   });
 });

@@ -7,6 +7,7 @@ import morgan from "morgan";
 import type { Pool } from "pg";
 import type Redis from "ioredis";
 import { healthRouter } from "./routes/health.ts";
+import { createAgentsRouter } from "./routes/agents.ts";
 import { errorHandler } from "./middleware/error-handler.ts";
 import { rateLimit } from "./middleware/rate-limit.ts";
 
@@ -16,6 +17,8 @@ export interface AppDependencies {
   pool: Pool;
   /** Redis client for caching and rate limiting. */
   redis: Redis;
+  /** HMAC-SHA256 secret for signing and verifying user JWTs. */
+  jwtSecret: string;
 }
 
 /**
@@ -35,6 +38,7 @@ export function createApp(deps: AppDependencies): Express {
   app.use(rateLimit(deps.redis));
 
   app.use("/health", healthRouter);
+  app.use("/agents", createAgentsRouter(deps.pool, deps.jwtSecret));
 
   app.use(errorHandler());
 
