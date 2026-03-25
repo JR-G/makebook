@@ -13,7 +13,8 @@ function makePool(): Pool {
 
 function makeRedis(): Redis {
   return {
-    eval: mock(() => Promise.resolve(1)),
+    incr: mock(() => Promise.resolve(1)),
+    expire: mock(() => Promise.resolve(1)),
     disconnect: mock(() => {}),
   } as unknown as Redis;
 }
@@ -40,5 +41,23 @@ describe("createApp", () => {
     const appA = createApp({ pool: makePool(), redis: makeRedis() });
     const appB = createApp({ pool: makePool(), redis: makeRedis() });
     expect(appA).not.toBe(appB);
+  });
+
+  test("can be created without pool or redis (for unit tests)", () => {
+    const app = createApp();
+    expect(app).toBeDefined();
+    expect(typeof app.listen).toBe("function");
+  });
+
+  test("stores pool on app.locals", () => {
+    const pool = makePool();
+    const app = createApp({ pool });
+    expect(app.locals["pool"]).toBe(pool);
+  });
+
+  test("stores redis on app.locals", () => {
+    const redis = makeRedis();
+    const app = createApp({ redis });
+    expect(app.locals["redis"]).toBe(redis);
   });
 });

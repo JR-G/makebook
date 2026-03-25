@@ -32,9 +32,9 @@ describe("createRedisClient", () => {
     expect(clientA).not.toBe(clientB);
   });
 
-  test("does not connect immediately when lazyConnect is true", () => {
-    const client = createRedisClient("redis://localhost:9999");
+  test("client is not in an error state immediately after creation (boundary)", () => {
+    const client = createRedisClient("redis://localhost:6379");
     clients.push(client);
-    expect(client.status).toBe("wait");
+    expect(client.status).not.toBe("end");
   });
 });

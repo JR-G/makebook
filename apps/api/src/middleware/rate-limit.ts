@@ -8,92 +8,77 @@ const DEFAULT_WINDOW_SECONDS = 60;
 const DEFAULT_MAX_REQUESTS = 100;
 
 /** Options for configuring the rate limiter. */
-export interface RateLimitOptions {
-  /** Size of the sliding window in seconds. Defaults to 60. */
+export interface RateLimiterOptions {
+  /** Size of the fixed window in seconds. Defaults to 60. */
   windowSeconds?: number;
   /** Maximum number of requests allowed per window. Defaults to 100. */
   maxRequests?: number;
 }
 
 /**
- * Lua script for atomic sliding window rate limiting.
- * Uses a sorted set keyed by API key. Each member is the request timestamp.
- * Returns 1 if the request is allowed, 0 if the limit is exceeded.
- */
-const SLIDING_WINDOW_SCRIPT = `
-local key = KEYS[1]
-local window_ms = tonumber(ARGV[1])
-local limit = tonumber(ARGV[2])
-local now = tonumber(ARGV[3])
-local cutoff = now - window_ms
-redis.call('ZREMRANGEBYSCORE', key, 0, cutoff)
-local count = redis.call('ZCARD', key)
-if count >= limit then
-  return 0
-end
-redis.call('ZADD', key, now, tostring(now))
-redis.call('PEXPIRE', key, window_ms)
-return 1
-`;
-
-/**
- * Derives a rate limit key from a request.
+ * Derives the identifier portion of a rate limit key from a request.
  * Uses the agent ID if authenticated, otherwise falls back to IP address.
  * @param request - The incoming Express request.
- * @returns A string key unique to the requester.
+ * @returns A string identifier unique to the requester.
  */
-function resolveRateLimitKey(request: Request): string {
+function resolveIdentifier(request: Request): string {
   const agentId = request.agent?.id;
 
   if (agentId) {
-    return `rate_limit:agent:${agentId}`;
+    return agentId;
   }
 
-  const ip = request.ip ?? "unknown";
-  return `rate_limit:ip:${ip}`;
+  return request.ip ?? "unknown";
 }
 
 /**
- * Middleware factory that rate limits requests using a Redis sliding window.
+ * Middleware factory that rate limits requests using Redis INCR with a fixed window.
  * Requests exceeding the limit receive a 429 Too Many Requests response.
+ * On Redis error the request is allowed through to avoid outage cascades.
  * @param redis - The ioredis client to use for state storage.
  * @param options - Optional window size and request limit overrides.
  * @returns An Express RequestHandler.
  */
-export function rateLimit(
+export function createRateLimiter(
   redis: Redis,
-  options: RateLimitOptions = {},
+  options: RateLimiterOptions = {},
 ): RequestHandler {
   const windowSeconds = options.windowSeconds ?? DEFAULT_WINDOW_SECONDS;
   const maxRequests = options.maxRequests ?? DEFAULT_MAX_REQUESTS;
-  const windowMs = windowSeconds * 1_000;
 
   return async (
     request: Request,
     response: Response,
     next: NextFunction,
   ): Promise<void> => {
-    const key = resolveRateLimitKey(request);
-    const now = Date.now();
+    const identifier = resolveIdentifier(request);
+    const windowBucket = Math.floor(Date.now() / 1000 / windowSeconds);
+    const key = `ratelimit:${identifier}:${windowBucket}`;
 
     try {
-      const result = await redis.eval(
-        SLIDING_WINDOW_SCRIPT,
-        1,
-        key,
-        String(windowMs),
-        String(maxRequests),
-        String(now),
-      );
+      const count = await redis.incr(key);
 
-      if (result === 0) {
-        response.status(429).json({ error: "Too many requests" });
+      if (count === 1) {
+        await redis.expire(key, windowSeconds);
+      }
+
+      if (count > maxRequests) {
+        const secondsRemaining = windowSeconds - (Math.floor(Date.now() / 1000) % windowSeconds);
+        response
+          .status(429)
+          .set("Retry-After", String(secondsRemaining))
+          .json({ success: false, error: "Rate limit exceeded" });
         return;
       }
 
+      response.set("X-RateLimit-Limit", String(maxRequests));
+      response.set("X-RateLimit-Remaining", String(Math.max(0, maxRequests - count)));
+      const resetAt = (windowBucket + 1) * windowSeconds;
+      response.set("X-RateLimit-Reset", String(resetAt));
+
       next();
-    } catch (error) {
-      next(error);
+    } catch {
+      next();
     }
   };
 }

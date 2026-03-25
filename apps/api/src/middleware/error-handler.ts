@@ -1,15 +1,18 @@
 import type { ErrorRequestHandler, Request, Response, NextFunction } from "express";
 
-/** Shape of an error with an HTTP status code. */
+/** Shape of an error with an optional HTTP status code. */
 interface HttpError {
   message?: string;
   statusCode?: number;
+  status?: number;
+  stack?: string;
 }
 
 /**
  * Determines the HTTP status code from an unknown error value.
+ * Accepts either `statusCode` or `status` properties.
  * @param error - The error to inspect.
- * @returns A valid HTTP status code, defaulting to 500.
+ * @returns A valid HTTP status code in the 4xx–5xx range, defaulting to 500.
  */
 function resolveStatusCode(error: unknown): number {
   if (typeof error !== "object" || error === null) {
@@ -17,7 +20,7 @@ function resolveStatusCode(error: unknown): number {
   }
 
   const httpError = error as HttpError;
-  const code = httpError.statusCode;
+  const code = httpError.statusCode ?? httpError.status;
 
   if (typeof code === "number" && code >= 400 && code < 600) {
     return code;
@@ -45,11 +48,13 @@ function resolveMessage(error: unknown): string {
 }
 
 /**
- * Global Express error handler. Returns a consistent JSON error response
- * for all unhandled errors passed to next(error).
+ * Creates a global Express error handler.
+ * Returns a consistent `{ success: false, error }` JSON response for all errors.
+ * In development mode the stack trace is included in the response.
+ * @param nodeEnv - The current Node.js environment (e.g. "development", "production").
  * @returns An Express ErrorRequestHandler.
  */
-export function errorHandler(): ErrorRequestHandler {
+export function createErrorHandler(nodeEnv: string): ErrorRequestHandler {
   return (
     error: unknown,
     _request: Request,
@@ -58,6 +63,15 @@ export function errorHandler(): ErrorRequestHandler {
   ): void => {
     const statusCode = resolveStatusCode(error);
     const message = resolveMessage(error);
-    response.status(statusCode).json({ error: message });
+
+    process.stderr.write(`[error] ${statusCode} ${message}\n`);
+
+    const body: Record<string, unknown> = { success: false, error: message };
+
+    if (nodeEnv === "development" && error instanceof Error && error.stack) {
+      body["stack"] = error.stack;
+    }
+
+    response.status(statusCode).json(body);
   };
 }
