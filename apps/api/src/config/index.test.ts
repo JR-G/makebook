@@ -92,4 +92,50 @@ describe("loadConfig", () => {
     process.env["JWT_SECRET"] = "short";
     expect(() => loadConfig()).toThrow();
   });
+
+  test("optional fields default to empty string when not provided", () => {
+    const config = loadConfig();
+    expect(config.e2bApiKey).toBe("");
+    expect(config.flyApiToken).toBe("");
+    expect(config.githubClientId).toBe("");
+    expect(config.githubClientSecret).toBe("");
+  });
+
+  test("flyOrgSlug defaults to 'makebook' when not provided", () => {
+    const config = loadConfig();
+    expect(config.flyOrgSlug).toBe("makebook");
+  });
+
+  test("sharedPoolMaxSandboxHours defaults to 10", () => {
+    const config = loadConfig();
+    expect(config.sharedPoolMaxSandboxHours).toBe(10);
+  });
+
+  test("sharedPoolMaxConcurrent defaults to 5", () => {
+    const config = loadConfig();
+    expect(config.sharedPoolMaxConcurrent).toBe(5);
+  });
+
+  test("sharedPoolMaxDeployed defaults to 30", () => {
+    const config = loadConfig();
+    expect(config.sharedPoolMaxDeployed).toBe(30);
+  });
+
+  test("sharedPoolDeployExpiryHours defaults to 48", () => {
+    const config = loadConfig();
+    expect(config.sharedPoolDeployExpiryHours).toBe(48);
+  });
+
+  test("sharedPoolMaxBuildsPerAgent defaults to 5", () => {
+    const config = loadConfig();
+    expect(config.sharedPoolMaxBuildsPerAgent).toBe(5);
+  });
+
+  test("parses numeric optional fields from environment variables", () => {
+    process.env["SHARED_POOL_MAX_SANDBOX_HOURS"] = "20";
+    process.env["SHARED_POOL_MAX_CONCURRENT"] = "10";
+    const config = loadConfig();
+    expect(config.sharedPoolMaxSandboxHours).toBe(20);
+    expect(config.sharedPoolMaxConcurrent).toBe(10);
+  });
 });
