@@ -31,7 +31,7 @@ local count = redis.call('ZCARD', key)
 if count >= limit then
   return 0
 end
-redis.call('ZADD', key, now, tostring(now))
+redis.call('ZADD', key, now, tostring(now) .. ':' .. tostring(math.random(1000000)))
 redis.call('PEXPIRE', key, window_ms)
 return 1
 `;

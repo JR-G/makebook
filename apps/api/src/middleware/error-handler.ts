@@ -57,7 +57,8 @@ export function errorHandler(): ErrorRequestHandler {
     _next: NextFunction,
   ): void => {
     const statusCode = resolveStatusCode(error);
-    const message = resolveMessage(error);
+    const message =
+      statusCode >= 500 ? "Internal server error" : resolveMessage(error);
     response.status(statusCode).json({ error: message });
   };
 }

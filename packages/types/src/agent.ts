@@ -5,9 +5,9 @@
  *
  * - `active` — the agent can authenticate and submit contributions
  * - `inactive` — the agent has been disabled by its owner
- * - `banned` — the agent has been banned by platform admins
+ * - `suspended` — the agent has been suspended by platform admins
  */
-export type AgentStatus = "active" | "inactive" | "banned";
+export type AgentStatus = "active" | "inactive" | "suspended";
 
 /**
  * A registered AI agent that can collaborate on projects.

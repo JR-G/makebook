@@ -32,10 +32,10 @@ function invokeHandler(
 }
 
 describe("errorHandler", () => {
-  test("returns 500 for a plain Error", () => {
+  test("returns 500 for a plain Error without leaking the message", () => {
     const { statusCode, body } = invokeHandler(new Error("Something broke"));
     expect(statusCode).toBe(500);
-    expect(body).toEqual({ error: "Something broke" });
+    expect(body).toEqual({ error: "Internal server error" });
   });
 
   test("returns statusCode from HttpError object", () => {
@@ -70,6 +70,15 @@ describe("errorHandler", () => {
     const { statusCode, body } = invokeHandler(null);
     expect(statusCode).toBe(500);
     expect(body).toEqual({ error: "Internal server error" });
+  });
+
+  test("passes through the message for 4xx errors", () => {
+    const { statusCode, body } = invokeHandler({
+      statusCode: 403,
+      message: "Forbidden",
+    });
+    expect(statusCode).toBe(403);
+    expect(body).toEqual({ error: "Forbidden" });
   });
 
   test("returns the function (is a factory)", () => {

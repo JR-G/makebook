@@ -1,6 +1,6 @@
-import { createHash } from "crypto";
 import type { RequestHandler, Request, Response, NextFunction } from "express";
 import type { Pool } from "pg";
+import { hashApiKey } from "@makebook/auth";
 
 /** SQL query to look up an active agent by their hashed API key. */
 const AGENT_LOOKUP_SQL =
@@ -16,15 +16,6 @@ function extractBearerToken(authHeader: string | undefined): string | null {
     return null;
   }
   return authHeader.slice("Bearer ".length);
-}
-
-/**
- * Hashes an API key with SHA-256 for safe storage and comparison.
- * @param apiKey - The raw API key string.
- * @returns The hex-encoded SHA-256 digest.
- */
-function hashApiKey(apiKey: string): string {
-  return createHash("sha256").update(apiKey).digest("hex");
 }
 
 /**
