@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 import type { Pool } from "pg";
 import type Redis from "ioredis";
 import type { AppConfig } from "./config/index.ts";
@@ -39,6 +40,7 @@ export function createApp(deps: AppDependencies): Express {
   app.use(compression());
   app.use(morgan("combined"));
   app.use(express.json());
+  app.use(cookieParser());
   app.use(rateLimit(deps.redis));
 
   app.use("/health", healthRouter);

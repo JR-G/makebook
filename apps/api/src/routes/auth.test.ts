@@ -6,6 +6,7 @@ import type { User } from "@makebook/types";
 import type { AppConfig } from "../config/index.ts";
 
 const TEST_JWT_SECRET = "test-secret-that-is-long-enough";
+const TEST_OAUTH_STATE = "deadbeef01234567deadbeef01234567";
 
 const TEST_CONFIG: AppConfig = {
   port: 3000,
@@ -43,10 +44,12 @@ function makeRequest(options: {
   pool?: Pool;
   config?: AppConfig;
   user?: User;
+  cookies?: Record<string, string>;
 } = {}): Request {
   return {
     headers: { authorization: options.authHeader },
     query: options.query ?? {},
+    cookies: options.cookies ?? {},
     app: {
       locals: {
         pool: options.pool ?? makePool([]),
@@ -63,16 +66,22 @@ function makeResponse(): {
     statusCode: number | undefined;
     body: unknown;
     redirectUrl: string | undefined;
+    cookies: Record<string, string>;
+    clearedCookies: string[];
   };
 } {
   const state: {
     statusCode: number | undefined;
     body: unknown;
     redirectUrl: string | undefined;
+    cookies: Record<string, string>;
+    clearedCookies: string[];
   } = {
     statusCode: undefined,
     body: undefined,
     redirectUrl: undefined,
+    cookies: {},
+    clearedCookies: [],
   };
 
   const response = {
@@ -86,6 +95,14 @@ function makeResponse(): {
     },
     redirect(url: string) {
       state.redirectUrl = url;
+      return response;
+    },
+    cookie(name: string, value: string) {
+      state.cookies[name] = value;
+      return response;
+    },
+    clearCookie(name: string) {
+      state.clearedCookies.push(name);
       return response;
     },
   } as unknown as Response;
@@ -143,6 +160,37 @@ describe("GET /auth/github", () => {
     expect(redirectUrl.searchParams.get("scope")).toContain("read:user");
     expect(redirectUrl.searchParams.get("scope")).toContain("user:email");
   });
+
+  test("includes a non-empty state parameter in the redirect URL", async () => {
+    const { authRouter } = await import("./auth.ts");
+    const { response, state } = makeResponse();
+
+    const handler = authRouter.stack.find(
+      (layer) => layer.route?.path === "/github",
+    )!.route!.stack[0]!.handle as (req: Request, res: Response, next: NextFunction) => void;
+
+    handler(makeRequest(), response, () => {});
+
+    const redirectUrl = new URL(state.redirectUrl!);
+    const stateParam = redirectUrl.searchParams.get("state");
+    expect(typeof stateParam).toBe("string");
+    expect((stateParam as string).length).toBeGreaterThan(0);
+  });
+
+  test("sets an oauth_state cookie matching the redirect state parameter", async () => {
+    const { authRouter } = await import("./auth.ts");
+    const { response, state } = makeResponse();
+
+    const handler = authRouter.stack.find(
+      (layer) => layer.route?.path === "/github",
+    )!.route!.stack[0]!.handle as (req: Request, res: Response, next: NextFunction) => void;
+
+    handler(makeRequest(), response, () => {});
+
+    const redirectUrl = new URL(state.redirectUrl!);
+    const stateParam = redirectUrl.searchParams.get("state");
+    expect(state.cookies["oauth_state"]).toBe(stateParam);
+  });
 });
 
 describe("GET /auth/github/callback", () => {
@@ -160,11 +208,97 @@ describe("GET /auth/github/callback", () => {
       next: NextFunction,
     ) => Promise<void>;
 
-    await handler(makeRequest({ query: {} }), response, () => { nextCalled = true; });
+    await handler(
+      makeRequest({ query: { state: TEST_OAUTH_STATE }, cookies: { oauth_state: TEST_OAUTH_STATE } }),
+      response,
+      () => { nextCalled = true; },
+    );
 
     expect(nextCalled).toBe(false);
     expect(state.statusCode).toBe(400);
     expect(state.body).toMatchObject({ success: false, error: "Missing code parameter" });
+  });
+
+  test("returns 400 when state parameter is missing", async () => {
+    const { authRouter } = await import("./auth.ts");
+    const { response, state } = makeResponse();
+
+    const handler = authRouter.stack.find(
+      (routeLayer) => routeLayer.route?.path === "/github/callback",
+    )!.route!.stack[0]!.handle as (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+    await handler(
+      makeRequest({ query: { code: "some-code" }, cookies: { oauth_state: TEST_OAUTH_STATE } }),
+      response,
+      () => {},
+    );
+
+    expect(state.statusCode).toBe(400);
+    expect(state.body).toMatchObject({ success: false, error: "Invalid or missing OAuth state" });
+  });
+
+  test("returns 400 when state does not match the cookie", async () => {
+    const { authRouter } = await import("./auth.ts");
+    const { response, state } = makeResponse();
+
+    const handler = authRouter.stack.find(
+      (routeLayer) => routeLayer.route?.path === "/github/callback",
+    )!.route!.stack[0]!.handle as (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+    await handler(
+      makeRequest({
+        query: { code: "some-code", state: "wrong-state" },
+        cookies: { oauth_state: TEST_OAUTH_STATE },
+      }),
+      response,
+      () => {},
+    );
+
+    expect(state.statusCode).toBe(400);
+    expect(state.body).toMatchObject({ success: false, error: "Invalid or missing OAuth state" });
+  });
+
+  test("returns 400 when oauth_state cookie is absent", async () => {
+    const { authRouter } = await import("./auth.ts");
+    const { response, state } = makeResponse();
+
+    const handler = authRouter.stack.find(
+      (routeLayer) => routeLayer.route?.path === "/github/callback",
+    )!.route!.stack[0]!.handle as (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+    await handler(
+      makeRequest({ query: { code: "some-code", state: TEST_OAUTH_STATE } }),
+      response,
+      () => {},
+    );
+
+    expect(state.statusCode).toBe(400);
+    expect(state.body).toMatchObject({ success: false, error: "Invalid or missing OAuth state" });
+  });
+
+  test("returns 400 when GitHub token exchange returns an error", async () => {
+    mockFetchSequence([
+      { data: { error: "bad_verification_code", error_description: "The code passed is incorrect or expired." } },
+    ]);
+
+    const { authRouter } = await import("./auth.ts");
+    const { response, state } = makeResponse();
+
+    const handler = authRouter.stack.find(
+      (routeLayer) => routeLayer.route?.path === "/github/callback",
+    )!.route!.stack[0]!.handle as (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+    await handler(
+      makeRequest({
+        query: { code: "bad-code", state: TEST_OAUTH_STATE },
+        cookies: { oauth_state: TEST_OAUTH_STATE },
+      }),
+      response,
+      (err) => { throw err as Error; },
+    );
+
+    expect(state.statusCode).toBe(400);
+    expect(state.body).toMatchObject({ success: false });
   });
 
   test("returns 200 with JWT token and user data on successful OAuth flow", async () => {
@@ -197,7 +331,11 @@ describe("GET /auth/github/callback", () => {
     ) => Promise<void>;
 
     await handler(
-      makeRequest({ query: { code: "github-oauth-code" }, pool }),
+      makeRequest({
+        query: { code: "github-oauth-code", state: TEST_OAUTH_STATE },
+        cookies: { oauth_state: TEST_OAUTH_STATE },
+        pool,
+      }),
       response,
       (err) => { throw err as Error; },
     );
@@ -218,6 +356,39 @@ describe("GET /auth/github/callback", () => {
     };
     expect(decoded.userId).toBe(TEST_USER.id);
     expect(decoded.username).toBe(TEST_USER.username);
+  });
+
+  test("clears the oauth_state cookie after successful state verification", async () => {
+    mockFetchSequence([
+      { data: { access_token: "gha_test_token" } },
+      { data: { id: 12345, login: "octocat" } },
+      { data: [{ email: "octocat@github.com", primary: true, verified: true }] },
+    ]);
+
+    const { authRouter } = await import("./auth.ts");
+    const { response, state } = makeResponse();
+
+    const pool: Pool = {
+      query: mock(() =>
+        Promise.resolve({ rows: [TEST_USER] } as QueryResult<User>),
+      ),
+    } as unknown as Pool;
+
+    const handler = authRouter.stack.find(
+      (routeLayer) => routeLayer.route?.path === "/github/callback",
+    )!.route!.stack[0]!.handle as (req: Request, res: Response, next: NextFunction) => Promise<void>;
+
+    await handler(
+      makeRequest({
+        query: { code: "github-oauth-code", state: TEST_OAUTH_STATE },
+        cookies: { oauth_state: TEST_OAUTH_STATE },
+        pool,
+      }),
+      response,
+      (err) => { throw err as Error; },
+    );
+
+    expect(state.clearedCookies).toContain("oauth_state");
   });
 
   test("upserts user on first login (creates new record)", async () => {
@@ -254,7 +425,11 @@ describe("GET /auth/github/callback", () => {
     ) => Promise<void>;
 
     await handler(
-      makeRequest({ query: { code: "new-user-code" }, pool }),
+      makeRequest({
+        query: { code: "new-user-code", state: TEST_OAUTH_STATE },
+        cookies: { oauth_state: TEST_OAUTH_STATE },
+        pool,
+      }),
       response,
       (err) => { throw err as Error; },
     );
@@ -296,7 +471,11 @@ describe("GET /auth/github/callback", () => {
     ) => Promise<void>;
 
     await handler(
-      makeRequest({ query: { code: "returning-user-code" }, pool }),
+      makeRequest({
+        query: { code: "returning-user-code", state: TEST_OAUTH_STATE },
+        cookies: { oauth_state: TEST_OAUTH_STATE },
+        pool,
+      }),
       response,
       (err) => { throw err as Error; },
     );
