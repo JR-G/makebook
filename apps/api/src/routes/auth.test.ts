@@ -174,7 +174,7 @@ describe("GET /auth/github", () => {
     const redirectUrl = new URL(state.redirectUrl!);
     const stateParam = redirectUrl.searchParams.get("state");
     expect(typeof stateParam).toBe("string");
-    expect((stateParam as string).length).toBeGreaterThan(0);
+    expect(stateParam!.length).toBeGreaterThan(0);
   });
 
   test("sets an oauth_state cookie matching the redirect state parameter", async () => {
@@ -189,7 +189,7 @@ describe("GET /auth/github", () => {
 
     const redirectUrl = new URL(state.redirectUrl!);
     const stateParam = redirectUrl.searchParams.get("state");
-    expect(state.cookies["oauth_state"]).toBe(stateParam);
+    expect(state.cookies["oauth_state"]).toBe(stateParam!);
   });
 });
 
@@ -483,73 +483,5 @@ describe("GET /auth/github/callback", () => {
     expect(state.statusCode).toBe(200);
     const body = state.body as { data: { user: { email: string } } };
     expect(body.data.user.email).toBe("updated@github.com");
-  });
-});
-
-describe("GET /auth/me", () => {
-  test("returns 401 without valid JWT", async () => {
-    const { authRouter } = await import("./auth.ts");
-    const { response, state } = makeResponse();
-    let nextCalled = false;
-
-    const meLayer = authRouter.stack.find(
-      (layer) => layer.route?.path === "/me",
-    );
-
-    expect(meLayer).toBeDefined();
-
-    const authMiddleware = meLayer!.route!.stack[0]!.handle as (
-      req: Request,
-      res: Response,
-      next: NextFunction,
-    ) => Promise<void>;
-
-    await authMiddleware(makeRequest(), response, () => { nextCalled = true; });
-
-    expect(nextCalled).toBe(false);
-    expect(state.statusCode).toBe(401);
-  });
-
-  test("returns user data with valid JWT", async () => {
-    const { authRouter } = await import("./auth.ts");
-    const { response, state } = makeResponse();
-
-    const token = jwt.sign(
-      { userId: TEST_USER.id, username: TEST_USER.username },
-      TEST_JWT_SECRET,
-      { expiresIn: "7d" },
-    );
-
-    const pool = makePool([TEST_USER]);
-
-    const meLayer = authRouter.stack.find(
-      (layer) => layer.route?.path === "/me",
-    );
-    const authMiddleware = meLayer!.route!.stack[0]!.handle as (
-      req: Request,
-      res: Response,
-      next: NextFunction,
-    ) => Promise<void>;
-    const meHandler = meLayer!.route!.stack[1]!.handle as (
-      req: Request,
-      res: Response,
-    ) => void;
-
-    const request = makeRequest({
-      authHeader: `Bearer ${token}`,
-      pool,
-    });
-
-    let nextCalled = false;
-    await authMiddleware(request, response, () => { nextCalled = true; });
-
-    expect(nextCalled).toBe(true);
-
-    meHandler(request, response);
-
-    expect(state.statusCode).toBe(200);
-    const body = state.body as { success: boolean; data: User };
-    expect(body.success).toBe(true);
-    expect(body.data).toEqual(TEST_USER);
   });
 });

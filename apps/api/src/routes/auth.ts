@@ -39,6 +39,22 @@ interface GitHubTokenResponse {
   error_description?: string;
 }
 
+async function exchangeCodeForToken(code: string, config: AppConfig): Promise<GitHubTokenResponse> {
+  const tokenResponse = await fetch(GITHUB_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      client_id: config.githubClientId,
+      client_secret: config.githubClientSecret,
+      code,
+    }),
+  });
+  return tokenResponse.json() as Promise<GitHubTokenResponse>;
+}
+
 /** Express router for GitHub OAuth and JWT authentication endpoints. */
 export const authRouter = Router();
 
@@ -90,7 +106,8 @@ authRouter.get("/github/callback", async (req, res, next) => {
     return;
   }
 
-  const cookieState = req.cookies?.[OAUTH_STATE_COOKIE] as string | undefined;
+  const cookieJar = req.cookies as Record<string, string | undefined>;
+  const cookieState = cookieJar[OAUTH_STATE_COOKIE];
   if (typeof state !== "string" || !cookieState || state !== cookieState) {
     res.status(400).json({ success: false, error: "Invalid or missing OAuth state" });
     return;
@@ -102,19 +119,7 @@ authRouter.get("/github/callback", async (req, res, next) => {
     const config = req.app.locals["config"] as AppConfig;
     const pool = req.app.locals["pool"] as Pool;
 
-    const tokenResponse = await fetch(GITHUB_TOKEN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        client_id: config.githubClientId,
-        client_secret: config.githubClientSecret,
-        code,
-      }),
-    });
-    const tokenData = (await tokenResponse.json()) as GitHubTokenResponse;
+    const tokenData = await exchangeCodeForToken(code, config);
 
     if (typeof tokenData.access_token !== "string" || tokenData.access_token.length === 0) {
       res.status(400).json({
