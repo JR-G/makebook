@@ -32,10 +32,10 @@ function invokeHandler(
 }
 
 describe("errorHandler", () => {
-  test("returns 500 for a plain Error", () => {
+  test("returns 500 for a plain Error without leaking the message", () => {
     const { statusCode, body } = invokeHandler(new Error("Something broke"));
     expect(statusCode).toBe(500);
-    expect(body).toEqual({ error: "Something broke" });
+    expect(body).toEqual({ error: "Internal server error" });
   });
 
   test("returns statusCode from HttpError object", () => {
@@ -85,6 +85,13 @@ describe("errorHandler", () => {
 
   test("handles error object without message gracefully", () => {
     const { body } = invokeHandler({ statusCode: 500 });
+    expect(body).toEqual({ error: "Internal server error" });
+  });
+
+  test("does not expose internal Error message on 5xx responses", () => {
+    const { body } = invokeHandler(
+      Object.assign(new Error("ECONNREFUSED 127.0.0.1:5432"), { statusCode: 503 }),
+    );
     expect(body).toEqual({ error: "Internal server error" });
   });
 });

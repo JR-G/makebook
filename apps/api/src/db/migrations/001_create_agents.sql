@@ -12,3 +12,15 @@ CREATE TABLE IF NOT EXISTS agents (
 
 CREATE INDEX IF NOT EXISTS idx_agents_api_key_hash ON agents (api_key_hash);
 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents (status);
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER agents_set_updated_at
+BEFORE UPDATE ON agents
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();

@@ -9,11 +9,8 @@ function makeRedis(evalResult: number): Redis {
   } as unknown as Redis;
 }
 
-function makeRequest(agentId?: string, ip = "127.0.0.1"): Request {
-  return {
-    ip,
-    agent: agentId ? { id: agentId, name: "Test Agent" } : undefined,
-  } as unknown as Request;
+function makeRequest(ip = "127.0.0.1"): Request {
+  return { ip } as unknown as Request;
 }
 
 function makeResponse(): {
@@ -41,7 +38,7 @@ function makeResponse(): {
 describe("rateLimit", () => {
   test("calls next() when Redis allows the request", async () => {
     const redis = makeRedis(1);
-    const request = makeRequest("agent-1");
+    const request = makeRequest();
     const { response } = makeResponse();
     let nextCalled = false;
     const next: NextFunction = () => { nextCalled = true; };
@@ -53,7 +50,7 @@ describe("rateLimit", () => {
 
   test("responds 429 when Redis denies the request", async () => {
     const redis = makeRedis(0);
-    const request = makeRequest("agent-1");
+    const request = makeRequest();
     const { response, state } = makeResponse();
     let nextCalled = false;
     const next: NextFunction = () => { nextCalled = true; };
@@ -65,7 +62,7 @@ describe("rateLimit", () => {
     expect(state.body).toEqual({ error: "Too many requests" });
   });
 
-  test("uses agent ID as rate limit key when agent is set", async () => {
+  test("uses IP address as rate limit key", async () => {
     let capturedKey = "";
     const redis = {
       eval: mock((_script: string, _numkeys: number, key: string) => {
@@ -74,43 +71,26 @@ describe("rateLimit", () => {
       }),
     } as unknown as Redis;
 
-    const request = makeRequest("my-agent-id");
-    const { response } = makeResponse();
-    await rateLimit(redis)(request, response, () => {});
-
-    expect(capturedKey).toBe("rate_limit:agent:my-agent-id");
-  });
-
-  test("falls back to IP address when no agent is set", async () => {
-    let capturedKey = "";
-    const redis = {
-      eval: mock((_script: string, _numkeys: number, key: string) => {
-        capturedKey = key;
-        return Promise.resolve(1);
-      }),
-    } as unknown as Redis;
-
-    const request = makeRequest(undefined, "10.0.0.1");
+    const request = makeRequest("10.0.0.1");
     const { response } = makeResponse();
     await rateLimit(redis)(request, response, () => {});
 
     expect(capturedKey).toBe("rate_limit:ip:10.0.0.1");
   });
 
-  test("calls next(error) when Redis eval throws", async () => {
-    const redisError = new Error("Redis connection lost");
+  test("fails open when Redis eval throws — calls next() without error", async () => {
     const redis = {
-      eval: mock(() => Promise.reject(redisError)),
+      eval: mock(() => Promise.reject(new Error("Redis connection lost"))),
     } as unknown as Redis;
 
-    const request = makeRequest("agent-1");
+    const request = makeRequest();
     const { response } = makeResponse();
-    let receivedError: unknown;
-    const next: NextFunction = (error) => { receivedError = error; };
+    let receivedError: unknown = "NOT_CALLED";
+    const next: NextFunction = (error?: unknown) => { receivedError = error; };
 
     await rateLimit(redis)(request, response, next);
 
-    expect(receivedError).toBe(redisError);
+    expect(receivedError).toBeUndefined();
   });
 
   test("accepts custom windowSeconds and maxRequests options", async () => {
@@ -122,7 +102,7 @@ describe("rateLimit", () => {
       }),
     } as unknown as Redis;
 
-    const request = makeRequest("agent-1");
+    const request = makeRequest();
     const { response } = makeResponse();
     await rateLimit(redis, { windowSeconds: 30, maxRequests: 50 })(
       request,
@@ -145,7 +125,7 @@ describe("rateLimit", () => {
       }),
     } as unknown as Redis;
 
-    const request = { ip: undefined, agent: undefined } as unknown as Request;
+    const request = { ip: undefined } as unknown as Request;
     const { response } = makeResponse();
     await rateLimit(redis)(request, response, () => {});
 

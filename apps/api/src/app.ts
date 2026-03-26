@@ -29,12 +29,12 @@ export function createApp(deps: AppDependencies): Express {
 
   app.use(helmet());
   app.use(cors());
+  // Health endpoint bypasses rate limiting so orchestrators never get false-negative checks.
+  app.use("/health", healthRouter);
+  app.use(rateLimit(deps.redis));
   app.use(compression());
   app.use(morgan("combined"));
   app.use(express.json());
-  app.use(rateLimit(deps.redis));
-
-  app.use("/health", healthRouter);
 
   app.use(errorHandler());
 

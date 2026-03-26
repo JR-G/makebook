@@ -1,6 +1,7 @@
 import { describe, test, expect, mock } from "bun:test";
 import type { Request, Response, NextFunction } from "express";
 import type { Pool, QueryResult } from "pg";
+import { generateApiKey } from "@makebook/auth";
 import { authenticateAgent } from "./auth.ts";
 
 function makePool(rows: { id: string; name: string }[]): Pool {
@@ -42,8 +43,9 @@ function makeResponse(): {
 
 describe("authenticateAgent", () => {
   test("calls next() and sets request.agent when token is valid", async () => {
+    const validKey = generateApiKey();
     const pool = makePool([{ id: "agent-1", name: "Test Agent" }]);
-    const request = makeRequest("Bearer valid-token");
+    const request = makeRequest(`Bearer ${validKey}`);
     const { response, state } = makeResponse();
     let nextCalled = false;
     const next: NextFunction = () => { nextCalled = true; };
@@ -82,9 +84,23 @@ describe("authenticateAgent", () => {
     expect(state.statusCode).toBe(401);
   });
 
-  test("responds 401 when API key is not found in the database", async () => {
+  test("responds 401 when Bearer token has invalid key format", async () => {
     const pool = makePool([]);
-    const request = makeRequest("Bearer unknown-token");
+    const request = makeRequest("Bearer not-a-valid-makebook-key");
+    const { response, state } = makeResponse();
+    let nextCalled = false;
+    const next: NextFunction = () => { nextCalled = true; };
+
+    await authenticateAgent(pool)(request, response, next);
+
+    expect(nextCalled).toBe(false);
+    expect(state.statusCode).toBe(401);
+  });
+
+  test("responds 401 when API key is not found in the database", async () => {
+    const unknownKey = generateApiKey();
+    const pool = makePool([]);
+    const request = makeRequest(`Bearer ${unknownKey}`);
     const { response, state } = makeResponse();
     let nextCalled = false;
     const next: NextFunction = () => { nextCalled = true; };
@@ -102,7 +118,8 @@ describe("authenticateAgent", () => {
       query: mock(() => Promise.reject(dbError)),
     } as unknown as Pool;
 
-    const request = makeRequest("Bearer some-token");
+    const validKey = generateApiKey();
+    const request = makeRequest(`Bearer ${validKey}`);
     const { response } = makeResponse();
     let receivedError: unknown;
     const next: NextFunction = (error) => { receivedError = error; };
@@ -121,11 +138,12 @@ describe("authenticateAgent", () => {
       }),
     } as unknown as Pool;
 
-    const request = makeRequest("Bearer my-raw-key");
+    const validKey = generateApiKey();
+    const request = makeRequest(`Bearer ${validKey}`);
     const { response } = makeResponse();
     await authenticateAgent(pool)(request, response, () => {});
 
-    expect(capturedHash).not.toBe("my-raw-key");
+    expect(capturedHash).not.toBe(validKey);
     expect(capturedHash).toHaveLength(64);
   });
 });
