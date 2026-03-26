@@ -87,8 +87,11 @@ export function rateLimit(
       }
 
       next();
-    } catch (error) {
-      next(error);
+    } catch {
+      // Fail open — Redis unavailability should not take down the API.
+      // Rate limiting is an optional protection layer; a Redis outage is
+      // not a reason to reject legitimate traffic.
+      next();
     }
   };
 }

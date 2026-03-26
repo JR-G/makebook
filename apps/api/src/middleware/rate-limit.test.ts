@@ -78,20 +78,24 @@ describe("rateLimit", () => {
     expect(capturedKey).toBe("rate_limit:ip:10.0.0.1");
   });
 
-  test("calls next(error) when Redis eval throws", async () => {
-    const redisError = new Error("Redis connection lost");
+  test("fails open (calls next without error) when Redis eval throws", async () => {
     const redis = {
-      eval: mock(() => Promise.reject(redisError)),
+      eval: mock(() => Promise.reject(new Error("Redis connection lost"))),
     } as unknown as Redis;
 
     const request = makeRequest();
     const { response } = makeResponse();
-    let receivedError: unknown;
-    const next: NextFunction = (error) => { receivedError = error; };
+    let nextCalled = false;
+    let receivedError: unknown = "sentinel";
+    const next: NextFunction = (error?) => {
+      nextCalled = true;
+      receivedError = error;
+    };
 
     await rateLimit(redis)(request, response, next);
 
-    expect(receivedError).toBe(redisError);
+    expect(nextCalled).toBe(true);
+    expect(receivedError).toBeUndefined();
   });
 
   test("accepts custom windowSeconds and maxRequests options", async () => {
