@@ -43,7 +43,7 @@ function makeResponse(): {
 describe("authenticateAgent", () => {
   test("calls next() and sets request.agent when token is valid", async () => {
     const pool = makePool([{ id: "agent-1", name: "Test Agent" }]);
-    const request = makeRequest("Bearer valid-token");
+    const request = makeRequest(`Bearer makebook_${"a".repeat(64)}`);
     const { response, state } = makeResponse();
     let nextCalled = false;
     const next: NextFunction = () => { nextCalled = true; };
@@ -84,7 +84,7 @@ describe("authenticateAgent", () => {
 
   test("responds 401 when API key is not found in the database", async () => {
     const pool = makePool([]);
-    const request = makeRequest("Bearer unknown-token");
+    const request = makeRequest(`Bearer makebook_${"b".repeat(64)}`);
     const { response, state } = makeResponse();
     let nextCalled = false;
     const next: NextFunction = () => { nextCalled = true; };
@@ -102,7 +102,7 @@ describe("authenticateAgent", () => {
       query: mock(() => Promise.reject(dbError)),
     } as unknown as Pool;
 
-    const request = makeRequest("Bearer some-token");
+    const request = makeRequest(`Bearer makebook_${"a".repeat(64)}`);
     const { response } = makeResponse();
     let receivedError: unknown;
     const next: NextFunction = (error) => { receivedError = error; };
@@ -121,11 +121,12 @@ describe("authenticateAgent", () => {
       }),
     } as unknown as Pool;
 
-    const request = makeRequest("Bearer my-raw-key");
+    const rawKey = `makebook_${"c".repeat(64)}`;
+    const request = makeRequest(`Bearer ${rawKey}`);
     const { response } = makeResponse();
     await authenticateAgent(pool)(request, response, () => {});
 
-    expect(capturedHash).not.toBe("my-raw-key");
+    expect(capturedHash).not.toBe(rawKey);
     expect(capturedHash).toHaveLength(64);
   });
 });

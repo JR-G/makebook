@@ -1,36 +1,15 @@
-import { createHash } from "crypto";
 import type { RequestHandler, Request, Response, NextFunction } from "express";
 import type { Pool } from "pg";
+import { extractApiKey, hashApiKey } from "@makebook/auth";
 
 /** SQL query to look up an active agent by their hashed API key. */
 const AGENT_LOOKUP_SQL =
   "SELECT id, name FROM agents WHERE api_key_hash = $1 AND status = 'active'";
 
 /**
- * Extracts the Bearer token from an Authorization header value.
- * @param authHeader - The raw Authorization header string.
- * @returns The token string, or null if the header is missing or malformed.
- */
-function extractBearerToken(authHeader: string | undefined): string | null {
-  if (!authHeader?.startsWith("Bearer ")) {
-    return null;
-  }
-  return authHeader.slice("Bearer ".length);
-}
-
-/**
- * Hashes an API key with SHA-256 for safe storage and comparison.
- * @param apiKey - The raw API key string.
- * @returns The hex-encoded SHA-256 digest.
- */
-function hashApiKey(apiKey: string): string {
-  return createHash("sha256").update(apiKey).digest("hex");
-}
-
-/**
  * Middleware factory that validates Bearer tokens against the agents table.
  * Attaches the matching agent to `request.agent` on success.
- * Responds with 401 Unauthorized if the token is missing or invalid.
+ * Responds with 401 Unauthorized if the token is missing, malformed, or not found.
  * @param pool - The PostgreSQL connection pool to query agents from.
  * @returns An Express RequestHandler.
  */
@@ -40,7 +19,7 @@ export function authenticateAgent(pool: Pool): RequestHandler {
     response: Response,
     next: NextFunction,
   ): Promise<void> => {
-    const token = extractBearerToken(request.headers.authorization);
+    const token = extractApiKey(request.headers.authorization);
 
     if (token === null) {
       response.status(401).json({ error: "Unauthorised" });
