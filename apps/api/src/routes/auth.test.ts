@@ -19,6 +19,7 @@ const TEST_CONFIG: AppConfig = {
   githubClientId: "test-client-id",
   githubClientSecret: "test-client-secret",
   githubCallbackUrl: "http://localhost:3000/auth/github/callback",
+  e2bApiKey: "e2b_test_key",
 };
 
 const TEST_USER: User = {

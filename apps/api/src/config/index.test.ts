@@ -12,6 +12,7 @@ const validEnv = {
   GITHUB_CLIENT_ID: "test-github-client-id",
   GITHUB_CLIENT_SECRET: "test-github-client-secret",
   GITHUB_CALLBACK_URL: "http://localhost:3000/auth/github/callback",
+  E2B_API_KEY: "e2b_test_key",
 };
 
 describe("loadConfig", () => {
@@ -40,6 +41,7 @@ describe("loadConfig", () => {
     expect(config.githubClientId).toBe(validEnv.GITHUB_CLIENT_ID);
     expect(config.githubClientSecret).toBe(validEnv.GITHUB_CLIENT_SECRET);
     expect(config.githubCallbackUrl).toBe(validEnv.GITHUB_CALLBACK_URL);
+    expect(config.e2bApiKey).toBe(validEnv.E2B_API_KEY);
   });
 
   test("defaults port to 3000 when not provided", () => {
@@ -111,6 +113,11 @@ describe("loadConfig", () => {
 
   test("throws on invalid GITHUB_CALLBACK_URL format", () => {
     process.env["GITHUB_CALLBACK_URL"] = "not-a-url";
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("throws on missing E2B_API_KEY", () => {
+    delete process.env["E2B_API_KEY"];
     expect(() => loadConfig()).toThrow();
   });
 });

@@ -11,6 +11,7 @@ const configSchema = z.object({
   githubClientId: z.string().min(1),
   githubClientSecret: z.string().min(1),
   githubCallbackUrl: z.string().url(),
+  e2bApiKey: z.string().min(1),
 });
 
 /** Validated application configuration derived from environment variables. */
@@ -32,5 +33,6 @@ export function loadConfig(): AppConfig {
     githubClientId: process.env["GITHUB_CLIENT_ID"],
     githubClientSecret: process.env["GITHUB_CLIENT_SECRET"],
     githubCallbackUrl: process.env["GITHUB_CALLBACK_URL"],
+    e2bApiKey: process.env["E2B_API_KEY"],
   });
 }
