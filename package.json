@@ -10,6 +10,7 @@
   },
   "type": "module",
   "private": true,
+  "workspaces": ["apps/api"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JR-G/makebook.git"

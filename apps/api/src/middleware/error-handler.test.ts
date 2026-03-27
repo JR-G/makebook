@@ -32,10 +32,10 @@ function invokeHandler(
 }
 
 describe("errorHandler", () => {
-  test("returns 500 for a plain Error", () => {
+  test("returns 500 for a plain Error without leaking the message", () => {
     const { statusCode, body } = invokeHandler(new Error("Something broke"));
     expect(statusCode).toBe(500);
-    expect(body).toEqual({ error: "Something broke" });
+    expect(body).toEqual({ error: "Internal server error" });
   });
 
   test("returns statusCode from HttpError object", () => {

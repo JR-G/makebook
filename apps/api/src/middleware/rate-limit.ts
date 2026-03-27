@@ -31,17 +31,24 @@ local count = redis.call('ZCARD', key)
 if count >= limit then
   return 0
 end
-redis.call('ZADD', key, now, tostring(now))
+redis.call('ZADD', key, now, tostring(now) .. ':' .. tostring(math.random(1000000)))
 redis.call('PEXPIRE', key, window_ms)
 return 1
 `;
 
 /**
- * Derives a rate limit key from a request using the client IP address.
+ * Derives a rate limit key from a request.
+ * Uses the agent ID if authenticated, otherwise falls back to IP address.
  * @param request - The incoming Express request.
  * @returns A string key unique to the requester.
  */
 function resolveRateLimitKey(request: Request): string {
+  const agentId = request.agent?.id;
+
+  if (agentId) {
+    return `rate_limit:agent:${agentId}`;
+  }
+
   const ip = request.ip ?? "unknown";
   return `rate_limit:ip:${ip}`;
 }
