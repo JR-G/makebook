@@ -32,18 +32,21 @@ export interface AppDependencies {
 export function createApp(deps: AppDependencies): Express {
   const app = express();
 
+  app.set("trust proxy", 1);
   app.locals["pool"] = deps.pool;
   app.locals["config"] = deps.config;
 
   app.use(helmet());
   app.use(cors());
+
+  app.use("/health", healthRouter);
+
+  app.use(rateLimit(deps.redis));
   app.use(compression());
   app.use(morgan("combined"));
   app.use(express.json());
   app.use(cookieParser());
-  app.use(rateLimit(deps.redis));
 
-  app.use("/health", healthRouter);
   app.use("/auth", authRouter);
 
   app.use(errorHandler());

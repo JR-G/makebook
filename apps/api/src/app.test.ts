@@ -57,4 +57,9 @@ describe("createApp", () => {
     const appB = createApp({ pool: makePool(), redis: makeRedis(), config: makeConfig() });
     expect(appA).not.toBe(appB);
   });
+
+  test("sets trust proxy so request.ip resolves behind a reverse proxy", () => {
+    const app = createApp({ pool: makePool(), redis: makeRedis(), config: makeConfig() });
+    expect(app.get("trust proxy")).toBeTruthy();
+  });
 });

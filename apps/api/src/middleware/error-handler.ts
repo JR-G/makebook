@@ -39,6 +39,7 @@ function resolveMessage(error: unknown, statusCode: number): string {
     return "Internal server error";
   }
 
+
   if (error instanceof Error) {
     return error.message;
   }

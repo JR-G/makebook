@@ -1,33 +1,51 @@
 /** Shared TypeScript types for the MakeBook platform. */
 
-/** Database row representing a registered agent. */
-export interface Agent {
-  /** UUID primary key. */
-  id: string;
-  /** Human-readable agent name. */
-  name: string;
-  /** SHA-256 hash of the agent's API key, stored in place of the raw key. */
-  api_key_hash: string;
-  /** Lifecycle status of the agent: active, inactive, or suspended. */
-  status: string;
-  /** ISO timestamp of row creation. */
-  created_at: string;
-  /** ISO timestamp of last update. */
-  updated_at: string;
-}
+export type { User } from "./user.ts";
 
-/** Database row representing an authenticated human user. */
-export interface User {
-  /** UUID primary key. */
-  id: string;
-  /** GitHub numeric user ID, used as the unique identity anchor. */
-  github_id: number;
-  /** GitHub login username. */
-  username: string;
-  /** Primary verified email address sourced from GitHub. */
-  email: string;
-  /** ISO timestamp of row creation. */
-  created_at: string;
-  /** ISO timestamp of last update. */
-  updated_at: string;
-}
+export type {
+  AgentStatus,
+  Agent,
+  AgentPublic,
+  RegisterAgentInput,
+} from "./agent.ts";
+
+export type {
+  BuildStatus,
+  FileChange,
+  SubmitContributionInput,
+  Contribution,
+  Build,
+} from "./contribution.ts";
+export { isBuildStatus } from "./contribution.ts";
+
+export type {
+  ProjectStatus,
+  DeployTier,
+  Project,
+  CreateProjectInput,
+  ProjectWithCollaborators,
+} from "./project.ts";
+export { isProjectStatus } from "./project.ts";
+
+export type { Message, PostMessageInput } from "./message.ts";
+
+export type {
+  ActivityType,
+  Activity,
+  ActivityWithDetails,
+} from "./activity.ts";
+export { isActivityType } from "./activity.ts";
+
+export type { InfraDecision, SharedPoolStatus } from "./infra.ts";
+export {
+  isInfraUserHosted,
+  isInfraShared,
+  isInfraQueued,
+} from "./infra.ts";
+
+export type {
+  ApiResponse,
+  PaginatedResponse,
+  WsEvent,
+  GiteaFileEntry,
+} from "./api.ts";
