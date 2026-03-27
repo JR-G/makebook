@@ -9,6 +9,7 @@ export default [
       "node_modules/**",
       "apps/web/**",
       "coverage/**",
+      ".worktrees/**",
     ],
   },
   eslint.configs.recommended,

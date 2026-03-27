@@ -14,7 +14,7 @@ if (migrationsApplied > 0) {
   process.stdout.write(`Applied ${migrationsApplied} database migration(s)\n`);
 }
 
-const app = createApp({ pool, redis });
+const app = createApp({ pool, redis, config });
 
 app.listen(config.port, () => {
   /** Startup log intentionally kept to stdout for container orchestration. */

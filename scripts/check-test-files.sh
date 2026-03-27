@@ -16,6 +16,7 @@ while IFS= read -r file; do
     deploy/*) continue ;;
     agents/*) continue ;;
     docs/*) continue ;;
+    *.config.ts) continue ;;
   esac
 
   if echo "$file" | grep -qE '\.tsx$'; then
