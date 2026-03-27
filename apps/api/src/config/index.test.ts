@@ -9,6 +9,7 @@ const validEnv = {
   GITEA_URL: "http://localhost:3001",
   GITEA_ADMIN_TOKEN: "test-admin-token",
   JWT_SECRET: "test-secret-that-is-long-enough",
+  E2B_API_KEY: "e2b_test_key",
 };
 
 describe("loadConfig", () => {
@@ -34,6 +35,7 @@ describe("loadConfig", () => {
     expect(config.giteaUrl).toBe(validEnv.GITEA_URL);
     expect(config.giteaAdminToken).toBe(validEnv.GITEA_ADMIN_TOKEN);
     expect(config.jwtSecret).toBe(validEnv.JWT_SECRET);
+    expect(config.e2bApiKey).toBe(validEnv.E2B_API_KEY);
   });
 
   test("defaults port to 3000 when not provided", () => {
@@ -90,6 +92,11 @@ describe("loadConfig", () => {
 
   test("throws on empty JWT_SECRET (too short)", () => {
     process.env["JWT_SECRET"] = "short";
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("throws on missing E2B_API_KEY", () => {
+    delete process.env["E2B_API_KEY"];
     expect(() => loadConfig()).toThrow();
   });
 });

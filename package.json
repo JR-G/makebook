@@ -32,13 +32,16 @@
     "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .hooks || true"
   },
   "dependencies": {
+    "bullmq": "^5.71.1",
     "compression": "^1.8.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "e2b": "^2.18.0",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "morgan": "^1.10.0",
     "pg": "^8.14.1",
+    "socket.io": "^4.8.3",
     "zod": "^3.24.0"
   },
   "devDependencies": {

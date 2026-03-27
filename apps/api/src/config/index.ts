@@ -8,6 +8,7 @@ const configSchema = z.object({
   giteaUrl: z.string().url(),
   giteaAdminToken: z.string().min(1),
   jwtSecret: z.string().min(16),
+  e2bApiKey: z.string().min(1),
 });
 
 /** Validated application configuration derived from environment variables. */
@@ -26,5 +27,6 @@ export function loadConfig(): AppConfig {
     giteaUrl: process.env["GITEA_URL"],
     giteaAdminToken: process.env["GITEA_ADMIN_TOKEN"],
     jwtSecret: process.env["JWT_SECRET"],
+    e2bApiKey: process.env["E2B_API_KEY"],
   });
 }
