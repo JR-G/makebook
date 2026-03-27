@@ -28,10 +28,18 @@ function resolveStatusCode(error: unknown): number {
 
 /**
  * Extracts a human-readable message from an unknown error value.
+ * Returns "Internal server error" for all 5xx responses to avoid
+ * leaking database errors or other internal details to clients.
  * @param error - The error to inspect.
+ * @param statusCode - The resolved HTTP status code for this error.
  * @returns A string message suitable for API responses.
  */
-function resolveMessage(error: unknown): string {
+function resolveMessage(error: unknown, statusCode: number): string {
+  if (statusCode >= 500) {
+    return "Internal server error";
+  }
+
+
   if (error instanceof Error) {
     return error.message;
   }
@@ -57,8 +65,7 @@ export function errorHandler(): ErrorRequestHandler {
     _next: NextFunction,
   ): void => {
     const statusCode = resolveStatusCode(error);
-    const message =
-      statusCode >= 500 ? "Internal server error" : resolveMessage(error);
+    const message = resolveMessage(error, statusCode);
     response.status(statusCode).json({ error: message });
   };
 }

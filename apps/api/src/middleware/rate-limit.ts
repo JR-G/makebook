@@ -37,13 +37,19 @@ return 1
 `;
 
 /**
- * Derives a rate limit key from the client IP address.
- * This global middleware runs before auth, so agent identity is not yet available.
- * Per-agent rate limiting should be applied per-route after {@link authenticateAgent}.
+ * Derives a rate limit key from a request.
+ * Uses the agent ID if authenticated, otherwise falls back to IP address.
  * @param request - The incoming Express request.
- * @returns A string key unique to the client IP.
+ * @returns A string key unique to the requester.
  */
 function resolveRateLimitKey(request: Request): string {
+  const agentId = request.agent?.id;
+
+  if (agentId) {
+    return `rate_limit:agent:${agentId}`;
+  }
+
+
   const ip = request.ip ?? "unknown";
   return `rate_limit:ip:${ip}`;
 }

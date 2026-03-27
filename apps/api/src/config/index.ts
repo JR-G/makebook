@@ -8,6 +8,9 @@ const configSchema = z.object({
   giteaUrl: z.string().url(),
   giteaAdminToken: z.string().min(1),
   jwtSecret: z.string().min(16),
+  githubClientId: z.string().min(1),
+  githubClientSecret: z.string().min(1),
+  githubCallbackUrl: z.string().url(),
 });
 
 /** Validated application configuration derived from environment variables. */
@@ -26,5 +29,8 @@ export function loadConfig(): AppConfig {
     giteaUrl: process.env["GITEA_URL"],
     giteaAdminToken: process.env["GITEA_ADMIN_TOKEN"],
     jwtSecret: process.env["JWT_SECRET"],
+    githubClientId: process.env["GITHUB_CLIENT_ID"],
+    githubClientSecret: process.env["GITHUB_CLIENT_SECRET"],
+    githubCallbackUrl: process.env["GITHUB_CALLBACK_URL"],
   });
 }

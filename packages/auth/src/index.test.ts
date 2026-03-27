@@ -4,6 +4,7 @@ import {
   hashApiKey,
   verifyApiKey,
   isApiKeyFormat,
+  extractApiKey,
   API_KEY_PREFIX,
   API_KEY_LENGTH,
 } from "./index.ts";
@@ -204,5 +205,35 @@ describe("verifyApiKey", () => {
     if (!invalidResult.valid) {
       expect(typeof invalidResult.reason).toBe("string");
     }
+  });
+});
+
+describe("extractApiKey", () => {
+  test("returns the key when Authorization header is a valid Bearer API key", () => {
+    const { key } = generateApiKey();
+    const result = extractApiKey(`Bearer ${key}`);
+    expect(result).toBe(key);
+  });
+
+  test("returns null when Authorization header is undefined", () => {
+    expect(extractApiKey(undefined)).toBeNull();
+  });
+
+  test("returns null when Authorization header does not start with Bearer", () => {
+    const { key } = generateApiKey();
+    expect(extractApiKey(`Basic ${key}`)).toBeNull();
+  });
+
+  test("returns null when token has correct prefix but wrong length", () => {
+    expect(extractApiKey("Bearer mk_tooshort")).toBeNull();
+  });
+
+  test("returns null when token lacks the mk_ prefix", () => {
+    const raw = "a".repeat(67);
+    expect(extractApiKey(`Bearer ${raw}`)).toBeNull();
+  });
+
+  test("edge case: returns null for empty string header", () => {
+    expect(extractApiKey("")).toBeNull();
   });
 });

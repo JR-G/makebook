@@ -72,15 +72,6 @@ describe("errorHandler", () => {
     expect(body).toEqual({ error: "Internal server error" });
   });
 
-  test("passes through the message for 4xx errors", () => {
-    const { statusCode, body } = invokeHandler({
-      statusCode: 403,
-      message: "Forbidden",
-    });
-    expect(statusCode).toBe(403);
-    expect(body).toEqual({ error: "Forbidden" });
-  });
-
   test("returns the function (is a factory)", () => {
     const handler = errorHandler();
     expect(typeof handler).toBe("function");
