@@ -12,6 +12,7 @@ while IFS= read -r file; do
     */main.ts|*/server.ts) continue ;;
     */test-helpers.ts|*/fixtures.ts|*/fixtures/*) continue ;;
     */index.ts|*/schema.ts) continue ;;
+    *.config.ts|*.config.mjs|*.config.js) continue ;;
     packages/types/*) continue ;;
     deploy/*) continue ;;
     agents/*) continue ;;
