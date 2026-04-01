@@ -8,6 +8,7 @@ import cookieParser from "cookie-parser";
 import type { Pool } from "pg";
 import type Redis from "ioredis";
 import type { AppConfig } from "./config/index.ts";
+import type { InfraRouter } from "./services/infra-router.ts";
 import { healthRouter } from "./routes/health.ts";
 import { authRouter } from "./routes/auth.ts";
 import { errorHandler } from "./middleware/error-handler.ts";
@@ -21,6 +22,8 @@ export interface AppDependencies {
   redis: Redis;
   /** Validated application configuration. */
   config: AppConfig;
+  /** Infrastructure routing decisions for build and deploy operations. */
+  infraRouter: InfraRouter;
 }
 
 /**
@@ -35,6 +38,7 @@ export function createApp(deps: AppDependencies): Express {
   app.set("trust proxy", 1);
   app.locals["pool"] = deps.pool;
   app.locals["config"] = deps.config;
+  app.locals["infraRouter"] = deps.infraRouter;
 
   app.use(helmet());
   app.use(cors());
