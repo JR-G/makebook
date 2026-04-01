@@ -31,6 +31,9 @@ function makeConfig(): AppConfig {
     githubClientId: "test-client-id",
     githubClientSecret: "test-client-secret",
     githubCallbackUrl: "http://localhost:3000/auth/github/callback",
+    flyApiToken: "test-fly-token",
+    flyOrgSlug: "test-org",
+    deployExpiryHours: 48,
   };
 }
 
