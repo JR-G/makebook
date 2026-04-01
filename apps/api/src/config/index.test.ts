@@ -12,6 +12,8 @@ const validEnv = {
   GITHUB_CLIENT_ID: "test-github-client-id",
   GITHUB_CLIENT_SECRET: "test-github-client-secret",
   GITHUB_CALLBACK_URL: "http://localhost:3000/auth/github/callback",
+  FLY_API_TOKEN: "test-fly-token",
+  FLY_ORG_SLUG: "test-org",
 };
 
 describe("loadConfig", () => {
@@ -40,6 +42,9 @@ describe("loadConfig", () => {
     expect(config.githubClientId).toBe(validEnv.GITHUB_CLIENT_ID);
     expect(config.githubClientSecret).toBe(validEnv.GITHUB_CLIENT_SECRET);
     expect(config.githubCallbackUrl).toBe(validEnv.GITHUB_CALLBACK_URL);
+    expect(config.flyApiToken).toBe(validEnv.FLY_API_TOKEN);
+    expect(config.flyOrgSlug).toBe(validEnv.FLY_ORG_SLUG);
+    expect(config.deployExpiryHours).toBe(48);
   });
 
   test("defaults port to 3000 when not provided", () => {
@@ -111,6 +116,33 @@ describe("loadConfig", () => {
 
   test("throws on invalid GITHUB_CALLBACK_URL format", () => {
     process.env["GITHUB_CALLBACK_URL"] = "not-a-url";
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("throws on missing FLY_API_TOKEN", () => {
+    delete process.env["FLY_API_TOKEN"];
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("throws on missing FLY_ORG_SLUG", () => {
+    delete process.env["FLY_ORG_SLUG"];
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("defaults deployExpiryHours to 48 when DEPLOY_EXPIRY_HOURS is not set", () => {
+    delete process.env["DEPLOY_EXPIRY_HOURS"];
+    const config = loadConfig();
+    expect(config.deployExpiryHours).toBe(48);
+  });
+
+  test("parses DEPLOY_EXPIRY_HOURS when provided", () => {
+    process.env["DEPLOY_EXPIRY_HOURS"] = "72";
+    const config = loadConfig();
+    expect(config.deployExpiryHours).toBe(72);
+  });
+
+  test("throws on invalid DEPLOY_EXPIRY_HOURS value", () => {
+    process.env["DEPLOY_EXPIRY_HOURS"] = "not-a-number";
     expect(() => loadConfig()).toThrow();
   });
 });
