@@ -43,6 +43,30 @@ const STOPPED_FLY_STATES = new Set(["stopped", "suspended"]);
 /** Fly.io state strings that map to the "running" lifecycle state. */
 const RUNNING_FLY_STATES = new Set(["started"]);
 
+interface MachineGuestConfig {
+  cpu_kind: string;
+  cpus: number;
+  memory_mb: number;
+}
+
+const SHARED_GUEST_CONFIG: MachineGuestConfig = {
+  cpu_kind: "shared",
+  cpus: 1,
+  memory_mb: 256,
+};
+
+const USER_HOSTED_GUEST_CONFIG: MachineGuestConfig = {
+  cpu_kind: "performance",
+  cpus: 1,
+  memory_mb: 512,
+};
+
+const SERVICE_AUTOSCALING = {
+  autostart: true,
+  autostop: "stop" as const,
+  min_machines_running: 0,
+};
+
 /**
  * Manages Fly.io deployments for built projects.
  *
@@ -68,6 +92,12 @@ export class DeployService {
     };
   }
 
+  private guestConfigForTier(tier: Project["deployTier"]): MachineGuestConfig {
+    return tier === "user_hosted"
+      ? USER_HOSTED_GUEST_CONFIG
+      : SHARED_GUEST_CONFIG;
+  }
+
   /**
    * Deploys a project to Fly.io as a Machine with auto-stop enabled.
    *
@@ -86,6 +116,7 @@ export class DeployService {
   ): Promise<DeployResult> {
     const token = options.flyToken ?? this.config.flyApiToken;
     const appName = this.appNameForProject(project);
+    const guestConfig = this.guestConfigForTier(project.deployTier);
 
     const createAppResponse = await fetch(`${this.FLY_API_BASE}/apps`, {
       method: "POST",
@@ -114,6 +145,7 @@ export class DeployService {
             auto_destroy: true,
             services: [
               {
+                ...SERVICE_AUTOSCALING,
                 ports: [
                   { port: 443, handlers: ["tls", "http"] },
                   { port: 80, handlers: ["http"] },
@@ -122,11 +154,7 @@ export class DeployService {
                 internal_port: 8080,
               },
             ],
-            guest: {
-              cpu_kind: "shared",
-              cpus: 1,
-              memory_mb: 256,
-            },
+            guest: { ...guestConfig },
           },
         }),
       },
@@ -159,12 +187,13 @@ export class DeployService {
    * @param appName - The Fly app name.
    * @throws If the Fly API returns a non-2xx response.
    */
-  async stop(machineId: string, appName: string): Promise<void> {
+  async stop(machineId: string, appName: string, flyToken?: string): Promise<void> {
+    const token = flyToken ?? this.config.flyApiToken;
     const response = await fetch(
       `${this.FLY_API_BASE}/apps/${appName}/machines/${machineId}/stop`,
       {
         method: "POST",
-        headers: this.flyHeaders(this.config.flyApiToken),
+        headers: this.flyHeaders(token),
       },
     );
 
@@ -186,12 +215,13 @@ export class DeployService {
    * @param appName - The Fly app name.
    * @throws If the Fly API returns a non-2xx, non-404 response.
    */
-  async destroy(machineId: string, appName: string): Promise<void> {
+  async destroy(machineId: string, appName: string, flyToken?: string): Promise<void> {
+    const token = flyToken ?? this.config.flyApiToken;
     const response = await fetch(
-      `${this.FLY_API_BASE}/apps/${appName}/machines/${machineId}`,
+      `${this.FLY_API_BASE}/apps/${appName}/machines/${machineId}?force=true`,
       {
         method: "DELETE",
-        headers: this.flyHeaders(this.config.flyApiToken),
+        headers: this.flyHeaders(token),
       },
     );
 
@@ -213,10 +243,11 @@ export class DeployService {
    * @param appName - The Fly app name.
    * @returns Normalised machine status.
    */
-  async getStatus(machineId: string, appName: string): Promise<MachineStatus> {
+  async getStatus(machineId: string, appName: string, flyToken?: string): Promise<MachineStatus> {
+    const token = flyToken ?? this.config.flyApiToken;
     const response = await fetch(
       `${this.FLY_API_BASE}/apps/${appName}/machines/${machineId}`,
-      { headers: this.flyHeaders(this.config.flyApiToken) },
+      { headers: this.flyHeaders(token) },
     );
 
     if (response.status === 404) {
@@ -279,23 +310,23 @@ export class DeployService {
     const expired = await this.checkExpired();
     let expiredCount = 0;
 
-    await Promise.all(
-      expired.map(async (project) => {
-        const appName = `makebook-${project.slug}`;
-        try {
-          await this.destroy(project.flyMachineId, appName);
-          await this.pool.query(
-            `UPDATE projects SET status = 'archived', updated_at = NOW() WHERE id = $1`,
-            [project.id],
-          );
-          expiredCount++;
-        } catch (error) {
-          process.stderr.write(
-            `Failed to expire project ${project.id}: ${String(error)}\n`,
-          );
-        }
-      }),
-    );
+    for (const project of expired) {
+      const appName = `makebook-${project.slug}`;
+      try {
+        await this.destroy(project.flyMachineId, appName);
+        await this.pool.query(
+          `UPDATE projects
+           SET status = 'archived', deploy_url = NULL, fly_machine_id = NULL, updated_at = NOW()
+           WHERE id = $1`,
+          [project.id],
+        );
+        expiredCount++;
+      } catch (error) {
+        process.stderr.write(
+          `Failed to expire project ${project.id}: ${String(error)}\n`,
+        );
+      }
+    }
 
     return expiredCount;
   }

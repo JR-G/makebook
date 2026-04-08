@@ -1,47 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
-import type { Pool } from "pg";
-import type { Project } from "@makebook/types";
 import { DeployService } from "./deploy.ts";
-
-const PLATFORM_TOKEN = "platform-fly-token";
-const ORG_SLUG = "makebook-org";
-const EXPIRY_HOURS = 48;
-
-const TEST_CONFIG = {
-  flyApiToken: PLATFORM_TOKEN,
-  flyOrgSlug: ORG_SLUG,
-  deployExpiryHours: EXPIRY_HOURS,
-};
-
-const TEST_PROJECT: Project = {
-  id: "proj-123",
-  slug: "my-project",
-  name: "My Project",
-  description: null,
-  creatorId: "agent-1",
-  giteaRepo: "org/my-project",
-  status: "in_progress",
-  deployUrl: null,
-  deployTier: "shared",
-  flyMachineId: null,
-  createdAt: new Date("2026-01-01T00:00:00Z"),
-};
-
-function makePool(queryResult: { rows: unknown[]; rowCount: number } = { rows: [], rowCount: 0 }): Pool {
-  return {
-    query: mock(() => Promise.resolve(queryResult)),
-  } as unknown as Pool;
-}
-
-function makeFetchResponse(
-  body: unknown,
-  status = 200,
-): Response {
-  return new Response(
-    typeof body === "string" ? body : JSON.stringify(body),
-    { status },
-  );
-}
+import {
+  PLATFORM_TOKEN,
+  TEST_CONFIG,
+  TEST_PROJECT,
+  makeFetchResponse,
+  makePool,
+  makeTrackingPool,
+} from "./deploy.test-helpers.ts";
 
 let originalFetch: typeof globalThis.fetch;
 
@@ -174,9 +140,38 @@ describe("DeployService.deploy", () => {
 
     expect(capturedUrls[1]).toContain("makebook-my-project/machines");
   });
+
 });
 
 describe("DeployService.destroy", () => {
+  test("appends ?force=true to the DELETE URL", async () => {
+    const service = new DeployService(makePool(), TEST_CONFIG);
+    let capturedUrl: string | undefined;
+    globalThis.fetch = mock(async (url: string | URL) => {
+      capturedUrl = url.toString();
+      return makeFetchResponse({}, 200);
+    }) as unknown as typeof fetch;
+
+    await service.destroy("machine-abc", "makebook-my-project");
+
+    expect(capturedUrl).toContain("?force=true");
+  });
+
+  test("respects optional flyToken with fallback to platform token", async () => {
+    const service = new DeployService(makePool(), TEST_CONFIG);
+    const auths: string[] = [];
+    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
+      auths.push((init?.headers as Record<string, string>)["Authorization"] ?? "");
+      return makeFetchResponse({}, 200);
+    }) as unknown as typeof fetch;
+
+    await service.destroy("machine-abc", "makebook-my-project", "user-token");
+    await service.destroy("machine-abc", "makebook-my-project");
+
+    expect(auths[0]).toBe("Bearer user-token");
+    expect(auths[1]).toBe(`Bearer ${PLATFORM_TOKEN}`);
+  });
+
   test("calls DELETE on the machine endpoint", async () => {
     const pool = makePool();
     const service = new DeployService(pool, TEST_CONFIG);
@@ -223,6 +218,23 @@ describe("DeployService.destroy", () => {
 });
 
 describe("DeployService.stop", () => {
+  test("respects optional flyToken with fallback to platform token", async () => {
+    const pool = makePool();
+    const service = new DeployService(pool, TEST_CONFIG);
+    const auths: string[] = [];
+
+    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
+      auths.push((init?.headers as Record<string, string>)["Authorization"] ?? "");
+      return makeFetchResponse({}, 200);
+    }) as unknown as typeof fetch;
+
+    await service.stop("machine-abc", "makebook-my-project", "user-token");
+    await service.stop("machine-abc", "makebook-my-project");
+
+    expect(auths[0]).toBe("Bearer user-token");
+    expect(auths[1]).toBe(`Bearer ${PLATFORM_TOKEN}`);
+  });
+
   test("calls POST to the stop endpoint", async () => {
     const pool = makePool();
     const service = new DeployService(pool, TEST_CONFIG);
@@ -374,14 +386,7 @@ describe("DeployService.expireAll", () => {
     const expiredRows = [
       { id: "proj-1", fly_machine_id: "machine-1", slug: "project-one" },
     ];
-    const queryCalls: unknown[][] = [];
-    const pool = {
-      query: mock(async (...args: unknown[]) => {
-        queryCalls.push(args);
-        if (queryCalls.length === 1) return { rows: expiredRows, rowCount: 1 };
-        return { rows: [], rowCount: 1 };
-      }),
-    } as unknown as Pool;
+    const { pool, queryCalls } = makeTrackingPool(expiredRows);
 
     const service = new DeployService(pool, TEST_CONFIG);
 
@@ -394,6 +399,8 @@ describe("DeployService.expireAll", () => {
     expect(count).toBe(1);
     const archiveCall = queryCalls[1] as [string, string[]];
     expect(archiveCall[1]).toContain("proj-1");
+    expect(archiveCall[0]).toContain("deploy_url = NULL");
+    expect(archiveCall[0]).toContain("fly_machine_id = NULL");
   });
 
   test("returns zero when no projects are expired", async () => {
@@ -409,14 +416,7 @@ describe("DeployService.expireAll", () => {
       { id: "proj-fail", fly_machine_id: "machine-bad", slug: "fail-project" },
       { id: "proj-ok", fly_machine_id: "machine-good", slug: "ok-project" },
     ];
-    const queryCalls: unknown[][] = [];
-    const pool = {
-      query: mock(async (...args: unknown[]) => {
-        queryCalls.push(args);
-        if (queryCalls.length === 1) return { rows: expiredRows, rowCount: 2 };
-        return { rows: [], rowCount: 1 };
-      }),
-    } as unknown as Pool;
+    const { pool } = makeTrackingPool(expiredRows);
 
     const service = new DeployService(pool, TEST_CONFIG);
 
@@ -434,14 +434,7 @@ describe("DeployService.expireAll", () => {
     const expiredRows = [
       { id: "proj-1", fly_machine_id: "machine-gone", slug: "gone-project" },
     ];
-    const queryCalls: unknown[][] = [];
-    const pool = {
-      query: mock(async (...args: unknown[]) => {
-        queryCalls.push(args);
-        if (queryCalls.length === 1) return { rows: expiredRows, rowCount: 1 };
-        return { rows: [], rowCount: 1 };
-      }),
-    } as unknown as Pool;
+    const { pool } = makeTrackingPool(expiredRows);
 
     const service = new DeployService(pool, TEST_CONFIG);
 
