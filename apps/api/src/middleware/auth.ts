@@ -6,9 +6,9 @@ import type { Agent, User } from "@makebook/types";
 import type { AppConfig } from "../config/index.ts";
 
 const AGENT_LOOKUP_SQL =
-  "SELECT * FROM agents WHERE api_key_hash = $1 AND status = 'active'";
+  "SELECT * FROM agents WHERE api_key_hash = $1 AND status = 'active' LIMIT 1";
 
-const USER_LOOKUP_SQL = "SELECT * FROM users WHERE id = $1";
+const USER_LOOKUP_SQL = "SELECT * FROM users WHERE id = $1 LIMIT 1";
 
 /** JWT payload shape issued during GitHub OAuth. */
 interface JwtPayload {
