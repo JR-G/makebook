@@ -36,9 +36,9 @@ describe("DeployService machine configuration", () => {
 
     await service.deploy(TEST_PROJECT, {});
 
-    expect(capturedServiceConfig?.autostart).toBe(true);
-    expect(capturedServiceConfig?.autostop).toBe("stop");
-    expect(capturedServiceConfig?.min_machines_running).toBe(0);
+    expect(capturedServiceConfig?.["autostart"]).toBe(true);
+    expect(capturedServiceConfig?.["autostop"]).toBe("stop");
+    expect(capturedServiceConfig?.["min_machines_running"]).toBe(0);
   });
 
   test("selects guest config based on deploy tier", async () => {
