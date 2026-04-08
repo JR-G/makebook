@@ -152,7 +152,8 @@ export class InfraRouter {
     const deployedResult = await this.pool.query<DeployedCountRow>(
       `SELECT COUNT(*) AS deployed_count
        FROM projects
-       WHERE deploy_url IS NOT NULL AND status = 'deployed'`,
+       WHERE deploy_url IS NOT NULL AND status = 'deployed'
+       LIMIT 1`,
     );
 
     const deployedCount = Number(deployedResult.rows[0]?.deployed_count ?? 0);
@@ -192,12 +193,11 @@ export class InfraRouter {
     const statusResult = await this.pool.query<PoolStatusRow>(
       `SELECT
          COALESCE(
-           (SELECT SUM(sandbox_seconds) FROM shared_pool_usage WHERE date = CURRENT_DATE),
+         (SELECT SUM(sandbox_seconds) FROM shared_pool_usage WHERE date = CURRENT_DATE LIMIT 1),
            0
          )                                                                     AS total_seconds,
-         (SELECT COUNT(*) FROM contributions WHERE status = 'building')        AS active_sandboxes,
-         (SELECT COUNT(*) FROM projects
-          WHERE deploy_url IS NOT NULL AND status = 'deployed')                AS deployed_apps`,
+         (SELECT COUNT(*) FROM contributions WHERE status = 'building' LIMIT 1) AS active_sandboxes,
+         (SELECT COUNT(*) FROM projects WHERE deploy_url IS NOT NULL AND status = 'deployed' LIMIT 1) AS deployed_apps`,
     );
 
     const row = statusResult.rows[0];
