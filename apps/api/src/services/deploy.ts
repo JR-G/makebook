@@ -43,11 +43,11 @@ const STOPPED_FLY_STATES = new Set(["stopped", "suspended"]);
 /** Fly.io state strings that map to the "running" lifecycle state. */
 const RUNNING_FLY_STATES = new Set(["started"]);
 
-type MachineGuestConfig = {
+interface MachineGuestConfig {
   cpu_kind: string;
   cpus: number;
   memory_mb: number;
-};
+}
 
 const SHARED_GUEST_CONFIG: MachineGuestConfig = {
   cpu_kind: "shared",

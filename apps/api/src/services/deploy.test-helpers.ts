@@ -32,6 +32,24 @@ export function makePool(queryResult: { rows: unknown[]; rowCount: number } = { 
   } as unknown as Pool;
 }
 
+/**
+ * Creates a Pool mock that records all query calls and returns expired rows on
+ * the first call, then empty rows for subsequent calls (archive updates).
+ */
+export function makeTrackingPool(
+  expiredRows: { id: string; fly_machine_id: string; slug: string }[],
+): { pool: Pool; queryCalls: unknown[][] } {
+  const queryCalls: unknown[][] = [];
+  const pool = {
+    query: mock((...args: unknown[]) => {
+      queryCalls.push(args);
+      if (queryCalls.length === 1) return Promise.resolve({ rows: expiredRows, rowCount: expiredRows.length });
+      return Promise.resolve({ rows: [], rowCount: 1 });
+    }),
+  } as unknown as Pool;
+  return { pool, queryCalls };
+}
+
 export function makeFetchResponse(body: unknown, status = 200): Response {
   return new Response(
     typeof body === "string" ? body : JSON.stringify(body),

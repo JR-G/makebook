@@ -35,8 +35,8 @@ const expiryInterval = setInterval(() => {
   });
 }, EXPIRY_CHECK_INTERVAL_MS);
 
-process.on("SIGTERM", () => clearInterval(expiryInterval));
-process.on("SIGINT", () => clearInterval(expiryInterval));
+process.on("SIGTERM", () => { clearInterval(expiryInterval); });
+process.on("SIGINT", () => { clearInterval(expiryInterval); });
 
 app.listen(config.port, () => {
   /** Startup log intentionally kept to stdout for container orchestration. */

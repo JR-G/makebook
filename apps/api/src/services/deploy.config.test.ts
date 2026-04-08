@@ -29,7 +29,8 @@ describe("DeployService machine configuration", () => {
         return makeFetchResponse({}, 201);
       }
 
-      capturedServiceConfig = JSON.parse(String(init?.body)).config.services[0];
+      const parsed = JSON.parse(init?.body as string) as { config: { services: Record<string, unknown>[] } };
+      capturedServiceConfig = parsed.config.services[0];
       return makeFetchResponse({ id: "machine-1", state: "started" }, 200);
     }) as unknown as typeof fetch;
 
@@ -51,7 +52,8 @@ describe("DeployService machine configuration", () => {
         return makeFetchResponse({}, 201);
       }
 
-      capturedGuests.push(JSON.parse(String(init?.body)).config.guest);
+      const parsedBody = JSON.parse(init?.body as string) as { config: { guest: Record<string, unknown> } };
+      capturedGuests.push(parsedBody.config.guest);
       return makeFetchResponse(
         { id: `machine-${capturedGuests.length}`, state: "started" },
         200,

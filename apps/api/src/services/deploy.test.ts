@@ -6,6 +6,7 @@ import {
   TEST_PROJECT,
   makeFetchResponse,
   makePool,
+  makeTrackingPool,
 } from "./deploy.test-helpers.ts";
 
 let originalFetch: typeof globalThis.fetch;
@@ -385,14 +386,7 @@ describe("DeployService.expireAll", () => {
     const expiredRows = [
       { id: "proj-1", fly_machine_id: "machine-1", slug: "project-one" },
     ];
-    const queryCalls: unknown[][] = [];
-    const pool = {
-      query: mock(async (...args: unknown[]) => {
-        queryCalls.push(args);
-        if (queryCalls.length === 1) return { rows: expiredRows, rowCount: 1 };
-        return { rows: [], rowCount: 1 };
-      }),
-    } as unknown as Pool;
+    const { pool, queryCalls } = makeTrackingPool(expiredRows);
 
     const service = new DeployService(pool, TEST_CONFIG);
 
@@ -405,8 +399,8 @@ describe("DeployService.expireAll", () => {
     expect(count).toBe(1);
     const archiveCall = queryCalls[1] as [string, string[]];
     expect(archiveCall[1]).toContain("proj-1");
-    expect(archiveCall[0] as string).toContain("deploy_url = NULL");
-    expect(archiveCall[0] as string).toContain("fly_machine_id = NULL");
+    expect(archiveCall[0]).toContain("deploy_url = NULL");
+    expect(archiveCall[0]).toContain("fly_machine_id = NULL");
   });
 
   test("returns zero when no projects are expired", async () => {
@@ -422,14 +416,7 @@ describe("DeployService.expireAll", () => {
       { id: "proj-fail", fly_machine_id: "machine-bad", slug: "fail-project" },
       { id: "proj-ok", fly_machine_id: "machine-good", slug: "ok-project" },
     ];
-    const queryCalls: unknown[][] = [];
-    const pool = {
-      query: mock(async (...args: unknown[]) => {
-        queryCalls.push(args);
-        if (queryCalls.length === 1) return { rows: expiredRows, rowCount: 2 };
-        return { rows: [], rowCount: 1 };
-      }),
-    } as unknown as Pool;
+    const { pool } = makeTrackingPool(expiredRows);
 
     const service = new DeployService(pool, TEST_CONFIG);
 
@@ -447,14 +434,7 @@ describe("DeployService.expireAll", () => {
     const expiredRows = [
       { id: "proj-1", fly_machine_id: "machine-gone", slug: "gone-project" },
     ];
-    const queryCalls: unknown[][] = [];
-    const pool = {
-      query: mock(async (...args: unknown[]) => {
-        queryCalls.push(args);
-        if (queryCalls.length === 1) return { rows: expiredRows, rowCount: 1 };
-        return { rows: [], rowCount: 1 };
-      }),
-    } as unknown as Pool;
+    const { pool } = makeTrackingPool(expiredRows);
 
     const service = new DeployService(pool, TEST_CONFIG);
 
