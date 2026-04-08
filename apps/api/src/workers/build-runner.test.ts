@@ -441,4 +441,90 @@ describe("job handler", () => {
     // only git clone + bun install called; bun run build must NOT be called
     expect(mockCommandsRun).toHaveBeenCalledTimes(2);
   });
+
+  it("clone URL host mismatch: contribution marked failed without running any commands", async () => {
+    const maliciousJobData: BuildJobData = {
+      ...baseJobData,
+      giteaCloneUrl: "http://attacker.com/evil/repo.git",
+    };
+
+    const contributionService = makeContributionService();
+
+    await invokeHandler(
+      makeInfraRouter({ tier: "shared" }),
+      contributionService,
+      makeFeedService(),
+      maliciousJobData
+    );
+
+    expect(mockCommandsRun).not.toHaveBeenCalled();
+    expect(contributionService.updateStatus).toHaveBeenLastCalledWith(
+      "contrib-1",
+      "failed",
+      expect.stringContaining("attacker.com")
+    );
+  });
+
+  it("clone URL unparseable: contribution marked failed without running any commands", async () => {
+    const badJobData: BuildJobData = {
+      ...baseJobData,
+      giteaCloneUrl: "not a url at all",
+    };
+
+    const contributionService = makeContributionService();
+
+    await invokeHandler(
+      makeInfraRouter({ tier: "shared" }),
+      contributionService,
+      makeFeedService(),
+      badJobData
+    );
+
+    expect(mockCommandsRun).not.toHaveBeenCalled();
+    expect(contributionService.updateStatus).toHaveBeenLastCalledWith(
+      "contrib-1",
+      "failed",
+      expect.stringContaining("Refused to clone")
+    );
+  });
+
+  it("recordUsage failure: status update and feed activity still execute", async () => {
+    const infraRouter = makeInfraRouter({ tier: "shared" });
+    (infraRouter.recordUsage as ReturnType<typeof mock>).mockImplementation(
+      () => Promise.reject(new Error("usage service down"))
+    );
+    const contributionService = makeContributionService();
+    const feedService = makeFeedService();
+
+    await invokeHandler(infraRouter, contributionService, feedService);
+
+    expect(contributionService.updateStatus).toHaveBeenLastCalledWith(
+      "contrib-1",
+      "passed",
+      expect.any(String)
+    );
+    expect(feedService.createActivity).toHaveBeenCalledWith(
+      "build_passed",
+      expect.any(Object)
+    );
+  });
+
+  it("git clone stdout/stderr are streamed to the build log", async () => {
+    mockCommandsRun.mockImplementation(
+      (_cmd: string, opts?: MockCommandOpts) => {
+        opts?.onStdout?.("Cloning into /app...");
+        opts?.onStderr?.("remote: Enumerating objects: 10");
+        return Promise.resolve({ exitCode: 0 });
+      }
+    );
+
+    await invokeHandler(
+      makeInfraRouter({ tier: "shared" }),
+      makeContributionService(),
+      makeFeedService()
+    );
+
+    expect(capturedLogLines).toContain("Cloning into /app...");
+    expect(capturedLogLines).toContain("[stderr] remote: Enumerating objects: 10");
+  });
 });

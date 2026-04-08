@@ -84,20 +84,54 @@ const BUILD_RATE_LIMIT_MAX = 10;
 const BUILD_RATE_LIMIT_DURATION_MS = 60_000;
 
 /**
+ * Asserts that a clone URL's host exactly matches the configured Gitea host.
+ * Prevents shell command injection via malicious URLs in job data.
+ * @param giteaCloneUrl - URL to validate.
+ * @param giteaUrl - Trusted base Gitea URL from server config.
+ * @throws Error if the clone URL is unparseable or its host differs from the configured Gitea host.
+ */
+function assertValidGiteaCloneUrl(
+  giteaCloneUrl: string,
+  giteaUrl: string
+): void {
+  let cloneHost: string;
+  try {
+    cloneHost = new URL(giteaCloneUrl).host;
+  } catch {
+    throw new Error(`Refused to clone: unparseable URL "${giteaCloneUrl}"`);
+  }
+  const allowedHost = new URL(giteaUrl).host;
+  if (cloneHost !== allowedHost) {
+    throw new Error(
+      `Refused to clone: URL host "${cloneHost}" is not the configured Gitea host "${allowedHost}"`
+    );
+  }
+}
+
+/**
  * Executes git clone, bun install, and bun run build inside the sandbox,
  * streaming stdout/stderr through the provided log callback.
  * @param sandbox - Active E2B sandbox instance.
- * @param giteaCloneUrl - Repository URL to clone.
+ * @param giteaCloneUrl - Repository URL to clone (validated against giteaUrl before use).
+ * @param giteaUrl - Trusted base Gitea URL used to validate the clone URL host.
  * @param log - Callback to receive each output line.
  * @returns Final build status based on command exit codes.
  */
 async function runBuildCommands(
   sandbox: Sandbox,
   giteaCloneUrl: string,
+  giteaUrl: string,
   log: (line: string) => void
 ): Promise<BuildStatus> {
+  assertValidGiteaCloneUrl(giteaCloneUrl, giteaUrl);
   const cloneResult = await sandbox.commands.run(
-    `git clone ${giteaCloneUrl} /app`
+    `git clone ${giteaCloneUrl} /app`,
+    {
+      onStdout: log,
+      onStderr: (line: string) => {
+        log(`[stderr] ${line}`);
+      },
+    }
   );
   if (cloneResult.exitCode !== 0) return "failed";
 
@@ -171,7 +205,7 @@ export function createBuildWorker(options: BuildWorkerOptions): Worker {
           broadcastBuildLog(io, projectId, line);
         };
 
-        buildStatus = await runBuildCommands(sandbox, giteaCloneUrl, log);
+        buildStatus = await runBuildCommands(sandbox, giteaCloneUrl, config.giteaUrl, log);
       } catch (error) {
         buildLog.push(error instanceof Error ? error.message : String(error));
         buildStatus = "failed";
@@ -179,7 +213,7 @@ export function createBuildWorker(options: BuildWorkerOptions): Worker {
         if (sandbox !== null) {
           const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
           await sandbox.kill().catch(() => undefined);
-          await infraRouter.recordUsage(agentId, durationSeconds);
+          await infraRouter.recordUsage(agentId, durationSeconds).catch(() => undefined);
         }
       }
 

@@ -61,6 +61,8 @@ const buildWorker = createBuildWorker({
 
 const shutdown = async (): Promise<void> => {
   process.stdout.write("Shutting down gracefully…\n");
+  httpServer.close();
+  await io.close();
   await buildWorker.close();
   await redis.quit();
   await pool.end();
