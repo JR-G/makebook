@@ -72,19 +72,14 @@ export class DeployService {
    * Deploys a project to Fly.io as a Machine with auto-stop enabled.
    *
    * Creates the Fly app if it does not already exist (409 is treated as success).
-   * Uses the caller-supplied `flyToken` if provided, otherwise falls back to the
-   * platform token from config.
+   * Uses the platform token from config for all Fly API calls.
    *
    * @param project - The project to deploy.
-   * @param options - Optional per-user Fly token.
    * @returns Deploy URL and machine ID on success.
    * @throws If Fly API calls fail with an unexpected status code.
    */
-  async deploy(
-    project: Project,
-    options: { flyToken?: string },
-  ): Promise<DeployResult> {
-    const token = options.flyToken ?? this.config.flyApiToken;
+  async deploy(project: Project): Promise<DeployResult> {
+    const token = this.config.flyApiToken;
     const appName = this.appNameForProject(project);
 
     const createAppResponse = await fetch(`${this.FLY_API_BASE}/apps`, {
@@ -142,12 +137,17 @@ export class DeployService {
     const machine = (await createMachineResponse.json()) as FlyMachineResponse;
     const deployUrl = `https://${appName}.fly.dev`;
 
-    await this.pool.query(
-      `UPDATE projects
-       SET status = 'deployed', deploy_url = $1, fly_machine_id = $2, updated_at = NOW()
-       WHERE id = $3`,
-      [deployUrl, machine.id, project.id],
-    );
+    try {
+      await this.pool.query(
+        `UPDATE projects
+         SET status = 'deployed', deploy_url = $1, fly_machine_id = $2, updated_at = NOW()
+         WHERE id = $3`,
+        [deployUrl, machine.id, project.id],
+      );
+    } catch (dbError) {
+      await this.destroy(machine.id, appName);
+      throw dbError;
+    }
 
     return { deployUrl, machineId: machine.id };
   }
@@ -256,7 +256,8 @@ export class DeployService {
       `SELECT id, fly_machine_id, slug
        FROM projects
        WHERE status = 'deployed'
-         AND updated_at < NOW() - ($1 * INTERVAL '1 hour')`,
+         AND deploy_tier = 'shared'
+         AND updated_at < NOW() - ($1::int * INTERVAL '1 hour')`,
       [this.config.deployExpiryHours],
     );
 
