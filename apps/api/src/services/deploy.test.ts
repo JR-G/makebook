@@ -1,47 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
-import type { Pool } from "pg";
-import type { Project } from "@makebook/types";
 import { DeployService } from "./deploy.ts";
-
-const PLATFORM_TOKEN = "platform-fly-token";
-const ORG_SLUG = "makebook-org";
-const EXPIRY_HOURS = 48;
-
-const TEST_CONFIG = {
-  flyApiToken: PLATFORM_TOKEN,
-  flyOrgSlug: ORG_SLUG,
-  deployExpiryHours: EXPIRY_HOURS,
-};
-
-const TEST_PROJECT: Project = {
-  id: "proj-123",
-  slug: "my-project",
-  name: "My Project",
-  description: null,
-  creatorId: "agent-1",
-  giteaRepo: "org/my-project",
-  status: "in_progress",
-  deployUrl: null,
-  deployTier: "shared",
-  flyMachineId: null,
-  createdAt: new Date("2026-01-01T00:00:00Z"),
-};
-
-function makePool(queryResult: { rows: unknown[]; rowCount: number } = { rows: [], rowCount: 0 }): Pool {
-  return {
-    query: mock(() => Promise.resolve(queryResult)),
-  } as unknown as Pool;
-}
-
-function makeFetchResponse(
-  body: unknown,
-  status = 200,
-): Response {
-  return new Response(
-    typeof body === "string" ? body : JSON.stringify(body),
-    { status },
-  );
-}
+import {
+  PLATFORM_TOKEN,
+  TEST_CONFIG,
+  TEST_PROJECT,
+  makeFetchResponse,
+  makePool,
+} from "./deploy.test-helpers.ts";
 
 let originalFetch: typeof globalThis.fetch;
 
@@ -175,68 +140,6 @@ describe("DeployService.deploy", () => {
     expect(capturedUrls[1]).toContain("makebook-my-project/machines");
   });
 
-  test("enables auto-start and auto-stop on machine services", async () => {
-    const pool = makePool();
-    const service = new DeployService(pool, TEST_CONFIG);
-    let capturedServiceConfig: Record<string, unknown> | undefined;
-
-    globalThis.fetch = mock(async (url: string | URL, init?: RequestInit) => {
-      const targetUrl = url.toString();
-      if (targetUrl.endsWith("/apps")) {
-        return makeFetchResponse({}, 201);
-      }
-
-      capturedServiceConfig = JSON.parse(String(init?.body)).config.services[0];
-      return makeFetchResponse({ id: "machine-1", state: "started" }, 200);
-    }) as unknown as typeof fetch;
-
-    await service.deploy(TEST_PROJECT, {});
-
-    expect(capturedServiceConfig?.autostart).toBe(true);
-    expect(capturedServiceConfig?.autostop).toBe("stop");
-    expect(capturedServiceConfig?.min_machines_running).toBe(0);
-  });
-
-  test("selects guest config based on deploy tier", async () => {
-    const pool = makePool();
-    const service = new DeployService(pool, TEST_CONFIG);
-    const capturedGuests: Record<string, unknown>[] = [];
-
-    globalThis.fetch = mock(async (url: string | URL, init?: RequestInit) => {
-      const targetUrl = url.toString();
-      if (targetUrl.endsWith("/apps")) {
-        return makeFetchResponse({}, 201);
-      }
-
-      capturedGuests.push(JSON.parse(String(init?.body)).config.guest);
-      return makeFetchResponse(
-        { id: `machine-${capturedGuests.length}`, state: "started" },
-        200,
-      );
-    }) as unknown as typeof fetch;
-
-    await service.deploy(TEST_PROJECT, {});
-    await service.deploy(
-      {
-        ...TEST_PROJECT,
-        id: "proj-user-tier",
-        slug: "user-tier",
-        deployTier: "user_hosted",
-      },
-      {},
-    );
-
-    expect(capturedGuests[0]).toEqual({
-      cpu_kind: "shared",
-      cpus: 1,
-      memory_mb: 256,
-    });
-    expect(capturedGuests[1]).toEqual({
-      cpu_kind: "performance",
-      cpus: 1,
-      memory_mb: 512,
-    });
-  });
 });
 
 describe("DeployService.destroy", () => {
