@@ -174,9 +174,100 @@ describe("DeployService.deploy", () => {
 
     expect(capturedUrls[1]).toContain("makebook-my-project/machines");
   });
+
+  test("enables auto-start and auto-stop on machine services", async () => {
+    const pool = makePool();
+    const service = new DeployService(pool, TEST_CONFIG);
+    let capturedServiceConfig: Record<string, unknown> | undefined;
+
+    globalThis.fetch = mock(async (url: string | URL, init?: RequestInit) => {
+      const targetUrl = url.toString();
+      if (targetUrl.endsWith("/apps")) {
+        return makeFetchResponse({}, 201);
+      }
+
+      capturedServiceConfig = JSON.parse(String(init?.body)).config.services[0];
+      return makeFetchResponse({ id: "machine-1", state: "started" }, 200);
+    }) as unknown as typeof fetch;
+
+    await service.deploy(TEST_PROJECT, {});
+
+    expect(capturedServiceConfig?.autostart).toBe(true);
+    expect(capturedServiceConfig?.autostop).toBe("stop");
+    expect(capturedServiceConfig?.min_machines_running).toBe(0);
+  });
+
+  test("selects guest config based on deploy tier", async () => {
+    const pool = makePool();
+    const service = new DeployService(pool, TEST_CONFIG);
+    const capturedGuests: Record<string, unknown>[] = [];
+
+    globalThis.fetch = mock(async (url: string | URL, init?: RequestInit) => {
+      const targetUrl = url.toString();
+      if (targetUrl.endsWith("/apps")) {
+        return makeFetchResponse({}, 201);
+      }
+
+      capturedGuests.push(JSON.parse(String(init?.body)).config.guest);
+      return makeFetchResponse(
+        { id: `machine-${capturedGuests.length}`, state: "started" },
+        200,
+      );
+    }) as unknown as typeof fetch;
+
+    await service.deploy(TEST_PROJECT, {});
+    await service.deploy(
+      {
+        ...TEST_PROJECT,
+        id: "proj-user-tier",
+        slug: "user-tier",
+        deployTier: "user_hosted",
+      },
+      {},
+    );
+
+    expect(capturedGuests[0]).toEqual({
+      cpu_kind: "shared",
+      cpus: 1,
+      memory_mb: 256,
+    });
+    expect(capturedGuests[1]).toEqual({
+      cpu_kind: "performance",
+      cpus: 1,
+      memory_mb: 512,
+    });
+  });
 });
 
 describe("DeployService.destroy", () => {
+  test("appends ?force=true to the DELETE URL", async () => {
+    const service = new DeployService(makePool(), TEST_CONFIG);
+    let capturedUrl: string | undefined;
+    globalThis.fetch = mock(async (url: string | URL) => {
+      capturedUrl = url.toString();
+      return makeFetchResponse({}, 200);
+    }) as unknown as typeof fetch;
+
+    await service.destroy("machine-abc", "makebook-my-project");
+
+    expect(capturedUrl).toContain("?force=true");
+  });
+
+  test("respects optional flyToken with fallback to platform token", async () => {
+    const service = new DeployService(makePool(), TEST_CONFIG);
+    const auths: string[] = [];
+    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
+      auths.push((init?.headers as Record<string, string>)["Authorization"] ?? "");
+      return makeFetchResponse({}, 200);
+    }) as unknown as typeof fetch;
+
+    await service.destroy("machine-abc", "makebook-my-project", "user-token");
+    await service.destroy("machine-abc", "makebook-my-project");
+
+    expect(auths[0]).toBe("Bearer user-token");
+    expect(auths[1]).toBe(`Bearer ${PLATFORM_TOKEN}`);
+  });
+
   test("calls DELETE on the machine endpoint", async () => {
     const pool = makePool();
     const service = new DeployService(pool, TEST_CONFIG);
@@ -223,6 +314,23 @@ describe("DeployService.destroy", () => {
 });
 
 describe("DeployService.stop", () => {
+  test("respects optional flyToken with fallback to platform token", async () => {
+    const pool = makePool();
+    const service = new DeployService(pool, TEST_CONFIG);
+    const auths: string[] = [];
+
+    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
+      auths.push((init?.headers as Record<string, string>)["Authorization"] ?? "");
+      return makeFetchResponse({}, 200);
+    }) as unknown as typeof fetch;
+
+    await service.stop("machine-abc", "makebook-my-project", "user-token");
+    await service.stop("machine-abc", "makebook-my-project");
+
+    expect(auths[0]).toBe("Bearer user-token");
+    expect(auths[1]).toBe(`Bearer ${PLATFORM_TOKEN}`);
+  });
+
   test("calls POST to the stop endpoint", async () => {
     const pool = makePool();
     const service = new DeployService(pool, TEST_CONFIG);
@@ -394,6 +502,8 @@ describe("DeployService.expireAll", () => {
     expect(count).toBe(1);
     const archiveCall = queryCalls[1] as [string, string[]];
     expect(archiveCall[1]).toContain("proj-1");
+    expect(archiveCall[0] as string).toContain("deploy_url = NULL");
+    expect(archiveCall[0] as string).toContain("fly_machine_id = NULL");
   });
 
   test("returns zero when no projects are expired", async () => {
