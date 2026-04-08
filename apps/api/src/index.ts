@@ -33,7 +33,7 @@ const app = createApp({ pool, redis, config, infraRouter });
 
 const EXPIRY_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
-setInterval(() => {
+const expiryInterval = setInterval(() => {
   deployService.expireAll().then((count) => {
     if (count > 0) {
       process.stdout.write(`Expired ${count} deployment(s)\n`);
@@ -42,6 +42,9 @@ setInterval(() => {
     process.stderr.write(`Deployment expiry check failed: ${String(error)}\n`);
   });
 }, EXPIRY_CHECK_INTERVAL_MS);
+
+process.on("SIGTERM", () => { clearInterval(expiryInterval); });
+process.on("SIGINT", () => { clearInterval(expiryInterval); });
 
 app.listen(config.port, () => {
   /** Startup log intentionally kept to stdout for container orchestration. */
