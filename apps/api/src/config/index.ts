@@ -11,6 +11,9 @@ const configSchema = z.object({
   githubClientId: z.string().min(1),
   githubClientSecret: z.string().min(1),
   githubCallbackUrl: z.string().url(),
+  flyApiToken: z.string().min(1),
+  flyOrgSlug: z.string().min(1),
+  deployExpiryHours: z.coerce.number().int().min(1).default(48),
 });
 
 /** Validated application configuration derived from environment variables. */
@@ -32,5 +35,8 @@ export function loadConfig(): AppConfig {
     githubClientId: process.env["GITHUB_CLIENT_ID"],
     githubClientSecret: process.env["GITHUB_CLIENT_SECRET"],
     githubCallbackUrl: process.env["GITHUB_CALLBACK_URL"],
+    flyApiToken: process.env["FLY_API_TOKEN"],
+    flyOrgSlug: process.env["FLY_ORG_SLUG"],
+    deployExpiryHours: process.env["DEPLOY_EXPIRY_HOURS"],
   });
 }
