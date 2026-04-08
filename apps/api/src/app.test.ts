@@ -54,6 +54,10 @@ function makeConfig(): AppConfig {
     flyApiToken: "test-fly-token",
     flyOrgSlug: "test-org",
     deployExpiryHours: 48,
+    sharedPoolMaxSandboxHours: 100,
+    sharedPoolMaxConcurrent: 10,
+    sharedPoolMaxDeployed: 20,
+    sharedPoolMaxBuildsPerAgent: 5,
   };
 }
 

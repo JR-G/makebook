@@ -11,8 +11,6 @@ export interface InfraConfig {
   sharedPoolMaxDeployed: number;
   /** Maximum number of builds a single agent may submit per calendar day. */
   sharedPoolMaxBuildsPerAgent: number;
-  /** Platform E2B API key used for builds on the shared pool. */
-  e2bApiKey: string;
 }
 
 interface UserInfraRow {
@@ -110,7 +108,8 @@ export class InfraRouter {
       `SELECT
          COUNT(*) FILTER (WHERE status = 'building') AS active_count,
          COUNT(*) FILTER (WHERE status = 'pending')  AS pending_count
-       FROM contributions`,
+       FROM contributions
+       WHERE updated_at >= NOW() - INTERVAL '2 hours'`,
     );
 
     const contribution = contributionResult.rows[0];
@@ -146,13 +145,13 @@ export class InfraRouter {
     const user = userResult.rows[0];
 
     if (user?.fly_api_token) {
-      return { type: "user_hosted", e2bKey: "", flyToken: user.fly_api_token };
+      return { type: "user_hosted", flyToken: user.fly_api_token };
     }
 
     const deployedResult = await this.pool.query<DeployedCountRow>(
       `SELECT COUNT(*) AS deployed_count
        FROM projects
-       WHERE deploy_url IS NOT NULL AND status = 'deployed'`,
+       WHERE deploy_url IS NOT NULL AND status = 'deployed' AND deploy_tier = 'shared'`,
     );
 
     const deployedCount = Number(deployedResult.rows[0]?.deployed_count ?? 0);
@@ -194,10 +193,11 @@ export class InfraRouter {
          COALESCE(
            (SELECT SUM(sandbox_seconds) FROM shared_pool_usage WHERE date = CURRENT_DATE),
            0
-         )                                                                     AS total_seconds,
-         (SELECT COUNT(*) FROM contributions WHERE status = 'building')        AS active_sandboxes,
+         )                                                                                          AS total_seconds,
+         (SELECT COUNT(*) FROM contributions
+          WHERE status = 'building' AND updated_at >= NOW() - INTERVAL '2 hours')                  AS active_sandboxes,
          (SELECT COUNT(*) FROM projects
-          WHERE deploy_url IS NOT NULL AND status = 'deployed')                AS deployed_apps`,
+          WHERE deploy_url IS NOT NULL AND status = 'deployed' AND deploy_tier = 'shared')         AS deployed_apps`,
     );
 
     const row = statusResult.rows[0];

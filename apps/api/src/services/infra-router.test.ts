@@ -7,7 +7,6 @@ const defaultConfig: InfraConfig = {
   sharedPoolMaxConcurrent: 10,
   sharedPoolMaxDeployed: 20,
   sharedPoolMaxBuildsPerAgent: 5,
-  e2bApiKey: "platform-e2b-key",
 };
 
 /** Creates a mock pool whose query function returns canned rows in call order. */
@@ -71,7 +70,7 @@ describe("InfraRouter", () => {
     it("returns queued when agent exceeds daily build limit", async () => {
       const pool = makePool([
         { rows: [{ e2b_api_key: null, fly_api_token: null }] },
-        { rows: [{ total_seconds: "0", agent_build_count: "5" }] }, // at cap (max = 5)
+        { rows: [{ total_seconds: "0", agent_build_count: "5" }] },
       ]);
       const router = new InfraRouter(pool, defaultConfig);
 
@@ -83,7 +82,7 @@ describe("InfraRouter", () => {
     it("returns queued when total sandbox hours exhausted", async () => {
       const pool = makePool([
         { rows: [{ e2b_api_key: null, fly_api_token: null }] },
-        { rows: [{ total_seconds: String(100 * 3600), agent_build_count: "0" }] }, // at cap
+        { rows: [{ total_seconds: String(100 * 3600), agent_build_count: "0" }] },
       ]);
       const router = new InfraRouter(pool, defaultConfig);
 
@@ -96,7 +95,7 @@ describe("InfraRouter", () => {
       const pool = makePool([
         { rows: [{ e2b_api_key: null, fly_api_token: null }] },
         { rows: [{ total_seconds: "0", agent_build_count: "0" }] },
-        { rows: [{ active_count: "10", pending_count: "3" }] }, // at max concurrent (10)
+        { rows: [{ active_count: "10", pending_count: "3" }] },
       ]);
       const router = new InfraRouter(pool, defaultConfig);
 
@@ -120,7 +119,7 @@ describe("InfraRouter", () => {
 
     it("falls through to shared pool when agent has no user link (no row returned)", async () => {
       const pool = makePool([
-        { rows: [] }, // no matching user row
+        { rows: [] },
         { rows: [{ total_seconds: "0", agent_build_count: "0" }] },
         { rows: [{ active_count: "0", pending_count: "0" }] },
       ]);
@@ -143,7 +142,6 @@ describe("InfraRouter", () => {
 
       expect(result).toEqual({
         type: "user_hosted",
-        e2bKey: "",
         flyToken: "user-fly-token",
       });
     });
@@ -163,7 +161,7 @@ describe("InfraRouter", () => {
     it("returns queued when max deployed apps reached", async () => {
       const pool = makePool([
         { rows: [{ e2b_api_key: null, fly_api_token: null }] },
-        { rows: [{ deployed_count: "20" }] }, // at cap (max = 20)
+        { rows: [{ deployed_count: "20" }] },
       ]);
       const router = new InfraRouter(pool, defaultConfig);
 
