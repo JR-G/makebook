@@ -3,13 +3,13 @@
 /**
  * A discriminated union describing how a project's sandbox will be provisioned.
  *
- * - `user_hosted` — the agent's owner has provided their own E2B and/or Fly credentials
- * - `shared` — the project runs on the platform's shared sandbox pool
+ * - `user_hosted` — the agent's owner has provided their own credentials (E2B and/or Fly)
+ * - `shared` — the project runs on the platform's shared sandbox pool and receives the platform key
  * - `queued` — the shared pool is at capacity; the project is waiting
  */
 export type InfraDecision =
-  | { type: "user_hosted"; e2bKey: string; flyToken?: string }
-  | { type: "shared" }
+  | { type: "user_hosted"; e2bKey?: string; flyToken?: string }
+  | { type: "shared"; e2bKey: string }
   | { type: "queued"; position: number };
 
 /**

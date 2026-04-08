@@ -84,7 +84,7 @@ describe("isInfraUserHosted", () => {
   });
 
   it("returns false for shared decisions", () => {
-    const decision: InfraDecision = { type: "shared" };
+    const decision: InfraDecision = { type: "shared", e2bKey: "platform-key" };
     expect(isInfraUserHosted(decision)).toBe(false);
   });
 
@@ -96,7 +96,7 @@ describe("isInfraUserHosted", () => {
 
 describe("isInfraShared", () => {
   it("returns true for shared decisions", () => {
-    const decision: InfraDecision = { type: "shared" };
+    const decision: InfraDecision = { type: "shared", e2bKey: "platform-key" };
     expect(isInfraShared(decision)).toBe(true);
   });
 
@@ -118,7 +118,7 @@ describe("isInfraQueued", () => {
   });
 
   it("returns false for shared decisions", () => {
-    const decision: InfraDecision = { type: "shared" };
+    const decision: InfraDecision = { type: "shared", e2bKey: "platform-key" };
     expect(isInfraQueued(decision)).toBe(false);
   });
 
