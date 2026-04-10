@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import type { Pool } from "pg";
 import type Redis from "ioredis";
 import type { AppConfig } from "../config/index.ts";
+import type { InfraRouter } from "../services/infra-router.ts";
 import { createApp } from "../app.ts";
 
 let server: Server | undefined;
@@ -37,12 +38,40 @@ function makeConfig(): AppConfig {
     flyApiToken: "test-fly-token",
     flyOrgSlug: "test-org",
     deployExpiryHours: 48,
+    sharedPoolMaxSandboxHours: 100,
+    sharedPoolMaxConcurrent: 10,
+    sharedPoolMaxDeployed: 20,
+    sharedPoolMaxBuildsPerAgent: 5,
   };
+}
+
+function makeInfraRouter(): InfraRouter {
+  return {
+    decideBuildInfra: mock(() => Promise.resolve({ type: "shared" as const })),
+    decideDeployInfra: mock(() => Promise.resolve({ type: "shared" as const })),
+    recordUsage: mock(() => Promise.resolve()),
+    getStatus: mock(() =>
+      Promise.resolve({
+        sandboxHoursUsedToday: 0,
+        sandboxHoursLimitToday: 100,
+        sandboxHoursRemaining: 100,
+        activeSandboxes: 0,
+        maxConcurrentSandboxes: 10,
+        deployedApps: 0,
+        maxDeployedApps: 20,
+      }),
+    ),
+  } as unknown as InfraRouter;
 }
 
 function startServer(): Promise<number> {
   return new Promise((resolve) => {
-    const app = createApp({ pool: makePool(), redis: makeRedis(), config: makeConfig() });
+    const app = createApp({
+      pool: makePool(),
+      redis: makeRedis(),
+      config: makeConfig(),
+      infraRouter: makeInfraRouter(),
+    });
     server = app.listen(0, () => {
       const addr = server?.address();
       const port = typeof addr === "object" && addr !== null ? addr.port : 0;

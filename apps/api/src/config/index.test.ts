@@ -145,4 +145,34 @@ describe("loadConfig", () => {
     process.env["DEPLOY_EXPIRY_HOURS"] = "not-a-number";
     expect(() => loadConfig()).toThrow();
   });
+
+  test("defaults shared pool limits when env vars are absent", () => {
+    const config = loadConfig();
+    expect(config.sharedPoolMaxSandboxHours).toBe(100);
+    expect(config.sharedPoolMaxConcurrent).toBe(10);
+    expect(config.sharedPoolMaxDeployed).toBe(20);
+    expect(config.sharedPoolMaxBuildsPerAgent).toBe(5);
+  });
+
+  test("parses shared pool limits when provided", () => {
+    process.env["SHARED_POOL_MAX_SANDBOX_HOURS"] = "200";
+    process.env["SHARED_POOL_MAX_CONCURRENT"] = "20";
+    process.env["SHARED_POOL_MAX_DEPLOYED"] = "50";
+    process.env["SHARED_POOL_MAX_BUILDS_PER_AGENT"] = "10";
+    const config = loadConfig();
+    expect(config.sharedPoolMaxSandboxHours).toBe(200);
+    expect(config.sharedPoolMaxConcurrent).toBe(20);
+    expect(config.sharedPoolMaxDeployed).toBe(50);
+    expect(config.sharedPoolMaxBuildsPerAgent).toBe(10);
+  });
+
+  test("throws on non-numeric SHARED_POOL_MAX_SANDBOX_HOURS (prevents NaN disabling capacity limits)", () => {
+    process.env["SHARED_POOL_MAX_SANDBOX_HOURS"] = "abc";
+    expect(() => loadConfig()).toThrow();
+  });
+
+  test("throws on zero SHARED_POOL_MAX_CONCURRENT (must be positive)", () => {
+    process.env["SHARED_POOL_MAX_CONCURRENT"] = "0";
+    expect(() => loadConfig()).toThrow();
+  });
 });

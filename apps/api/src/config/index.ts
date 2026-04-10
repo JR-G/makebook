@@ -14,6 +14,10 @@ const configSchema = z.object({
   flyApiToken: z.string().min(1),
   flyOrgSlug: z.string().min(1),
   deployExpiryHours: z.coerce.number().int().min(1).default(48),
+  sharedPoolMaxSandboxHours: z.coerce.number().int().positive().default(100),
+  sharedPoolMaxConcurrent: z.coerce.number().int().positive().default(10),
+  sharedPoolMaxDeployed: z.coerce.number().int().positive().default(20),
+  sharedPoolMaxBuildsPerAgent: z.coerce.number().int().positive().default(5),
 });
 
 /** Validated application configuration derived from environment variables. */
@@ -38,5 +42,9 @@ export function loadConfig(): AppConfig {
     flyApiToken: process.env["FLY_API_TOKEN"],
     flyOrgSlug: process.env["FLY_ORG_SLUG"],
     deployExpiryHours: process.env["DEPLOY_EXPIRY_HOURS"],
+    sharedPoolMaxSandboxHours: process.env["SHARED_POOL_MAX_SANDBOX_HOURS"],
+    sharedPoolMaxConcurrent: process.env["SHARED_POOL_MAX_CONCURRENT"],
+    sharedPoolMaxDeployed: process.env["SHARED_POOL_MAX_DEPLOYED"],
+    sharedPoolMaxBuildsPerAgent: process.env["SHARED_POOL_MAX_BUILDS_PER_AGENT"],
   });
 }

@@ -5,6 +5,7 @@ import { createPool } from "./config/database.ts";
 import { createRedisClient } from "./config/redis.ts";
 import { runMigrations } from "./db/migrate.ts";
 import { DeployService } from "./services/deploy.ts";
+import { InfraRouter } from "./services/infra-router.ts";
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
@@ -21,7 +22,14 @@ const deployService = new DeployService(pool, {
   deployExpiryHours: config.deployExpiryHours,
 });
 
-const app = createApp({ pool, redis, config });
+const infraRouter = new InfraRouter(pool, {
+  sharedPoolMaxSandboxHours: config.sharedPoolMaxSandboxHours,
+  sharedPoolMaxConcurrent: config.sharedPoolMaxConcurrent,
+  sharedPoolMaxDeployed: config.sharedPoolMaxDeployed,
+  sharedPoolMaxBuildsPerAgent: config.sharedPoolMaxBuildsPerAgent,
+});
+
+const app = createApp({ pool, redis, config, infraRouter });
 
 const EXPIRY_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 

@@ -32,15 +32,14 @@ describe("DeployService.deploy", () => {
       return makeFetchResponse({ id: machineId, state: "started" }, 200);
     }) as unknown as typeof fetch;
 
-    const result = await service.deploy(TEST_PROJECT, {});
+    const result = await service.deploy(TEST_PROJECT);
 
     expect(result.deployUrl).toBe("https://makebook-my-project.fly.dev");
     expect(result.machineId).toBe(machineId);
     expect((pool.query as ReturnType<typeof mock>).mock.calls.length).toBe(1);
   });
 
-  test("uses provided flyToken over platform token", async () => {
-    const userToken = "user-fly-token";
+  test("uses platform flyApiToken for all Fly API calls", async () => {
     const pool = makePool();
     const service = new DeployService(pool, TEST_CONFIG);
     const capturedHeaders: string[] = [];
@@ -51,26 +50,41 @@ describe("DeployService.deploy", () => {
       return makeFetchResponse({ id: "machine-1", state: "started" }, 200);
     }) as unknown as typeof fetch;
 
-    await service.deploy(TEST_PROJECT, { flyToken: userToken });
-
-    expect(capturedHeaders[0]).toBe(`Bearer ${userToken}`);
-    expect(capturedHeaders[1]).toBe(`Bearer ${userToken}`);
-  });
-
-  test("falls back to platform flyApiToken when no flyToken provided", async () => {
-    const pool = makePool();
-    const service = new DeployService(pool, TEST_CONFIG);
-    const capturedHeaders: string[] = [];
-
-    globalThis.fetch = mock(async (_url: string | URL, init?: RequestInit) => {
-      capturedHeaders.push((init?.headers as Record<string, string>)["Authorization"] ?? "");
-      if (capturedHeaders.length === 1) return makeFetchResponse({}, 201);
-      return makeFetchResponse({ id: "machine-1", state: "started" }, 200);
-    }) as unknown as typeof fetch;
-
-    await service.deploy(TEST_PROJECT, {});
+    await service.deploy(TEST_PROJECT);
 
     expect(capturedHeaders[0]).toBe(`Bearer ${PLATFORM_TOKEN}`);
+    expect(capturedHeaders[1]).toBe(`Bearer ${PLATFORM_TOKEN}`);
+  });
+
+  test("destroys machine and rethrows when database write fails", async () => {
+    const dbError = new Error("connection refused");
+    const destroyCalls: string[] = [];
+    const pool = {
+      query: mock(async () => { throw dbError; }),
+    } as unknown as Pool;
+    const service = new DeployService(pool, TEST_CONFIG);
+    let callCount = 0;
+
+    globalThis.fetch = mock(async (url: string | URL, init?: RequestInit) => {
+      callCount++;
+      if (callCount === 1) return makeFetchResponse({}, 201);
+      if ((init?.method ?? "GET") === "DELETE") {
+        destroyCalls.push(url.toString());
+        return makeFetchResponse({}, 200);
+      }
+      return makeFetchResponse({ id: "machine-to-rollback", state: "started" }, 200);
+    }) as unknown as typeof fetch;
+
+    let caughtError: Error | undefined;
+    try {
+      await service.deploy(TEST_PROJECT);
+    } catch (err) {
+      caughtError = err as Error;
+    }
+
+    expect(caughtError).toBe(dbError);
+    expect(destroyCalls.length).toBe(1);
+    expect(destroyCalls[0]).toContain("machine-to-rollback");
   });
 
   test("proceeds when app creation returns 409 (app already exists)", async () => {
@@ -84,7 +98,7 @@ describe("DeployService.deploy", () => {
       return makeFetchResponse({ id: "machine-1", state: "started" }, 200);
     }) as unknown as typeof fetch;
 
-    const result = await service.deploy(TEST_PROJECT, {});
+    const result = await service.deploy(TEST_PROJECT);
     expect(result.machineId).toBe("machine-1");
   });
 
@@ -98,7 +112,7 @@ describe("DeployService.deploy", () => {
 
     let caughtError: Error | undefined;
     try {
-      await service.deploy(TEST_PROJECT, {});
+      await service.deploy(TEST_PROJECT);
     } catch (err) {
       caughtError = err as Error;
     }
@@ -118,7 +132,7 @@ describe("DeployService.deploy", () => {
 
     let caughtError: Error | undefined;
     try {
-      await service.deploy(TEST_PROJECT, {});
+      await service.deploy(TEST_PROJECT);
     } catch (err) {
       caughtError = err as Error;
     }
@@ -136,7 +150,7 @@ describe("DeployService.deploy", () => {
       return makeFetchResponse({ id: "m1", state: "started" }, 200);
     }) as unknown as typeof fetch;
 
-    await service.deploy(TEST_PROJECT, {});
+    await service.deploy(TEST_PROJECT);
 
     expect(capturedUrls[1]).toContain("makebook-my-project/machines");
   });
@@ -378,6 +392,16 @@ describe("DeployService.checkExpired", () => {
 
     const queryCall = (pool.query as ReturnType<typeof mock>).mock.calls[0] as [string, unknown[]];
     expect(queryCall[1]).toEqual([72]);
+  });
+
+  test("filters to shared deploy_tier only", async () => {
+    const pool = makePool();
+    const service = new DeployService(pool, TEST_CONFIG);
+
+    await service.checkExpired();
+
+    const queryCall = (pool.query as ReturnType<typeof mock>).mock.calls[0] as [string, unknown[]];
+    expect(queryCall[0]).toContain("deploy_tier = 'shared'");
   });
 });
 
