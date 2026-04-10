@@ -1,5 +1,16 @@
-import { describe, test, expect } from "bun:test";
-import { createPool } from "./database.ts";
+import { describe, test, expect, mock } from "bun:test";
+import type { Pool, QueryResult, QueryResultRow } from "pg";
+import { createPool, query, queryOne } from "./database.ts";
+
+function makeResult<T extends QueryResultRow>(rows: T[]): QueryResult<T> {
+  return {
+    command: "SELECT",
+    rowCount: rows.length,
+    oid: 0,
+    rows,
+    fields: [],
+  };
+}
 
 describe("createPool", () => {
   test("returns a Pool instance with a query method", async () => {
@@ -28,5 +39,40 @@ describe("createPool", () => {
     );
     expect(pool).toBeDefined();
     await pool.end();
+  });
+
+  test("query delegates to pool.query with provided params", async () => {
+    const resultRows = [{ id: 1 }];
+    const fakePool = {
+      query: mock(() => Promise.resolve(makeResult(resultRows))),
+    } as unknown as Pool;
+
+    const result = await query(fakePool, "SELECT 1 WHERE id = $1", [1]);
+
+    expect(fakePool.query).toHaveBeenCalledWith("SELECT 1 WHERE id = $1", [1]);
+    expect(result.rows).toEqual(resultRows);
+  });
+
+  test("queryOne returns first row or null when no rows", async () => {
+    const rows = [{ id: "abc" }];
+    let callCount = 0;
+    const fakePool = {
+      query: mock(() => {
+        callCount += 1;
+        if (callCount === 1) {
+          return Promise.resolve(makeResult(rows));
+        }
+        return Promise.resolve(makeResult<{ id: string }>([]));
+      }),
+    } as unknown as Pool;
+
+    const first = await queryOne<{ id: string }>(fakePool, "SELECT * FROM table");
+    const firstRow = rows[0]!;
+    expect(first).toEqual(firstRow);
+
+    const none = await queryOne(fakePool, "SELECT * FROM table WHERE id = $1", [
+      "missing",
+    ]);
+    expect(none).toBeNull();
   });
 });
