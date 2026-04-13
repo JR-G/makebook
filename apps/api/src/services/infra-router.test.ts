@@ -30,6 +30,20 @@ function makeSingleQueryPool(rows: unknown[] = []): {
   return { pool: { query: spy } as unknown as Pool, spy };
 }
 
+/** Creates a multi-response mock pool and exposes the query spy for SQL assertion. */
+function makeSpyPool(responses: { rows: unknown[] }[]): {
+  pool: Pool;
+  spy: ReturnType<typeof mock>;
+} {
+  let callIndex = 0;
+  const spy = mock((..._args: unknown[]) => {
+    const response = responses[callIndex] ?? { rows: [] };
+    callIndex++;
+    return Promise.resolve(response);
+  });
+  return { pool: { query: spy } as unknown as Pool, spy };
+}
+
 describe("InfraRouter", () => {
   describe("decideBuildInfra", () => {
     it("returns user_hosted when agent owner has e2b_api_key", async () => {
@@ -128,6 +142,22 @@ describe("InfraRouter", () => {
       const result = await router.decideBuildInfra("agent-uuid-orphan");
 
       expect(result).toEqual({ type: "shared" });
+    });
+
+    it("contributions concurrency query filters to shared-pool projects only", async () => {
+      const { pool, spy } = makeSpyPool([
+        { rows: [{ e2b_api_key: null, fly_api_token: null }] },
+        { rows: [{ total_seconds: "0", agent_build_count: "0" }] },
+        { rows: [{ active_count: "0", pending_count: "0" }] },
+      ]);
+      const router = new InfraRouter(pool, defaultConfig);
+
+      await router.decideBuildInfra("agent-uuid-1");
+
+      const calls = spy.mock.calls as [string, unknown[]][];
+      const contributionsSql = calls[2]![0];
+      expect(contributionsSql).toContain("deploy_tier");
+      expect(contributionsSql).toContain("'shared'");
     });
   });
 
@@ -291,6 +321,20 @@ describe("InfraRouter", () => {
 
       expect(status.sandboxHoursRemaining).toBe(0);
       expect(status.sandboxHoursUsedToday).toBe(150);
+    });
+
+    it("active_sandboxes subquery filters to shared-pool projects only", async () => {
+      const { pool, spy } = makeSpyPool([
+        { rows: [{ total_seconds: "0", active_sandboxes: "0", deployed_apps: "0" }] },
+      ]);
+      const router = new InfraRouter(pool, defaultConfig);
+
+      await router.getStatus();
+
+      const calls = spy.mock.calls as [string, unknown[]][];
+      const sql = calls[0]![0];
+      expect(sql).toContain("deploy_tier");
+      expect(sql).toContain("'shared'");
     });
   });
 });

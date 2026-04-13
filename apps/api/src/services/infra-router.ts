@@ -106,10 +106,12 @@ export class InfraRouter {
 
     const contributionResult = await this.pool.query<ContributionStatusRow>(
       `SELECT
-         COUNT(*) FILTER (WHERE status = 'building') AS active_count,
-         COUNT(*) FILTER (WHERE status = 'pending')  AS pending_count
-       FROM contributions
-       WHERE updated_at >= NOW() - INTERVAL '2 hours'`,
+         COUNT(*) FILTER (WHERE c.status = 'building') AS active_count,
+         COUNT(*) FILTER (WHERE c.status = 'pending')  AS pending_count
+       FROM contributions c
+       JOIN projects p ON p.id = c.project_id
+       WHERE c.updated_at >= NOW() - INTERVAL '2 hours'
+         AND p.deploy_tier = 'shared'`,
     );
 
     const contribution = contributionResult.rows[0];
@@ -194,8 +196,10 @@ export class InfraRouter {
            (SELECT SUM(sandbox_seconds) FROM shared_pool_usage WHERE date = CURRENT_DATE),
            0
          )                                                                                          AS total_seconds,
-         (SELECT COUNT(*) FROM contributions
-          WHERE status = 'building' AND updated_at >= NOW() - INTERVAL '2 hours')                  AS active_sandboxes,
+         (SELECT COUNT(*) FROM contributions c
+          JOIN projects p ON p.id = c.project_id
+          WHERE c.status = 'building' AND c.updated_at >= NOW() - INTERVAL '2 hours'
+            AND p.deploy_tier = 'shared')                                                           AS active_sandboxes,
          (SELECT COUNT(*) FROM projects
           WHERE deploy_url IS NOT NULL AND status = 'deployed' AND deploy_tier = 'shared')         AS deployed_apps`,
     );
