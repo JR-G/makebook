@@ -57,6 +57,24 @@ export class InfraRouter {
   ) {}
 
   /**
+   * Fetches the infrastructure credentials for the user who owns the given agent.
+   *
+   * Returns `null` when the agent has no linked user (orphaned agent).
+   *
+   * @param agentId - UUID of the agent whose owner credentials are needed
+   */
+  private async getUserInfraCredentials(agentId: string): Promise<UserInfraRow | null> {
+    const result = await this.pool.query<UserInfraRow>(
+      `SELECT u.e2b_api_key, u.fly_api_token
+       FROM agents a
+       JOIN users u ON u.id = a.user_id
+       WHERE a.id = $1`,
+      [agentId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /**
    * Determines which infrastructure tier should handle a build for the given agent.
    *
    * Decision order:
@@ -69,15 +87,7 @@ export class InfraRouter {
    * @param agentId - UUID of the agent requesting a build
    */
   async decideBuildInfra(agentId: string): Promise<InfraDecision> {
-    const userResult = await this.pool.query<UserInfraRow>(
-      `SELECT u.e2b_api_key, u.fly_api_token
-       FROM agents a
-       JOIN users u ON u.id = a.user_id
-       WHERE a.id = $1`,
-      [agentId],
-    );
-
-    const user = userResult.rows[0];
+    const user = await this.getUserInfraCredentials(agentId);
 
     if (user?.e2b_api_key) {
       return { type: "user_hosted", e2bKey: user.e2b_api_key };
@@ -136,15 +146,7 @@ export class InfraRouter {
    * @param agentId - UUID of the agent requesting a deployment
    */
   async decideDeployInfra(agentId: string): Promise<InfraDecision> {
-    const userResult = await this.pool.query<UserInfraRow>(
-      `SELECT u.e2b_api_key, u.fly_api_token
-       FROM agents a
-       JOIN users u ON u.id = a.user_id
-       WHERE a.id = $1`,
-      [agentId],
-    );
-
-    const user = userResult.rows[0];
+    const user = await this.getUserInfraCredentials(agentId);
 
     if (user?.fly_api_token) {
       return { type: "user_hosted", flyToken: user.fly_api_token };
@@ -188,6 +190,12 @@ export class InfraRouter {
 
   /**
    * Returns a real-time snapshot of the shared pool's current utilisation.
+   *
+   * Note: pool-hour totals use `CURRENT_DATE` (resets at midnight) while active
+   * sandbox counts use a rolling `NOW() - INTERVAL '2 hours'` window to exclude
+   * stuck builds that never updated their status. Near midnight the active count
+   * can briefly include carry-over builds from the previous day while today's
+   * hour total starts at zero — this is intentional.
    */
   async getStatus(): Promise<SharedPoolStatus> {
     const statusResult = await this.pool.query<PoolStatusRow>(

@@ -9,5 +9,6 @@ CREATE TABLE IF NOT EXISTS shared_pool_usage (
   PRIMARY KEY (date, agent_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_shared_pool_usage_date     ON shared_pool_usage (date);
+-- idx_shared_pool_usage_date is omitted: the composite PK (date, agent_id) already
+-- serves prefix lookups on date, making a separate single-column index redundant.
 CREATE INDEX IF NOT EXISTS idx_shared_pool_usage_agent_id ON shared_pool_usage (agent_id);
