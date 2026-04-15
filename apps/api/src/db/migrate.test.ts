@@ -45,6 +45,8 @@ describe("runMigrations", () => {
     const client = makeClient([
       "001_create_agents.sql",
       "002_create_users.sql",
+      "003_add_infra_credentials.sql",
+      "004_create_shared_pool_usage.sql",
     ]);
     const pool = makePool(client);
 
