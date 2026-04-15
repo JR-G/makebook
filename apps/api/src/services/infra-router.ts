@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { InfraDecision, SharedPoolStatus } from "@makebook/types";
+import type { CredentialCipher } from "./credential-cipher.ts";
 
 /** Configuration for shared-pool limits and platform-level credentials. */
 export interface InfraConfig {
@@ -21,11 +22,16 @@ export interface InfraConfig {
  * Implements the co-operative model: user-hosted credentials take priority;
  * if absent, the shared pool is used subject to daily and concurrency limits.
  * When the pool is exhausted, requests are marked as queued with a position hint.
+ *
+ * User credentials (`e2b_api_key`, `fly_api_token`) are stored AES-256-GCM
+ * encrypted in the database. The supplied {@link CredentialCipher} decrypts
+ * them at query time; plaintext values never persist beyond this service.
  */
 export class InfraRouter {
   constructor(
     private readonly pool: Pool,
     private readonly config: InfraConfig,
+    private readonly cipher: CredentialCipher,
   ) {}
 
   /**
@@ -51,9 +57,9 @@ export class InfraRouter {
       [agentId],
     );
 
-    const e2bKey = ownerResult.rows[0]?.e2b_api_key ?? null;
-    if (e2bKey) {
-      return { type: "user_hosted", e2bKey };
+    const encryptedE2bKey = ownerResult.rows[0]?.e2b_api_key ?? null;
+    if (encryptedE2bKey) {
+      return { type: "user_hosted", e2bKey: this.cipher.decrypt(encryptedE2bKey) };
     }
 
     const agentUsageResult = await this.pool.query<{ build_count: number }>(
@@ -121,9 +127,9 @@ export class InfraRouter {
       [agentId],
     );
 
-    const flyToken = ownerResult.rows[0]?.fly_api_token ?? null;
-    if (flyToken) {
-      return { type: "user_hosted", e2bKey: "", flyToken };
+    const encryptedFlyToken = ownerResult.rows[0]?.fly_api_token ?? null;
+    if (encryptedFlyToken) {
+      return { type: "user_hosted", e2bKey: "", flyToken: this.cipher.decrypt(encryptedFlyToken) };
     }
 
     const deployedResult = await this.pool.query<{ count: string }>(

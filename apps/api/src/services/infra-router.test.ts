@@ -2,6 +2,13 @@ import { describe, test, expect, mock } from "bun:test";
 import type { Pool } from "pg";
 import { InfraRouter } from "./infra-router.ts";
 import type { InfraConfig } from "./infra-router.ts";
+import type { CredentialCipher } from "./credential-cipher.ts";
+
+/** Identity cipher used in tests — DB mock returns plaintext directly. */
+const identityCipher: CredentialCipher = {
+  encrypt: (value: string) => value,
+  decrypt: (value: string) => value,
+};
 
 const TEST_CONFIG: InfraConfig = {
   sharedPoolMaxSandboxHours: 100,
@@ -31,7 +38,7 @@ describe("decideBuildInfra", () => {
     const pool = makeSequentialPool([
       { rows: [{ e2b_api_key: "user-e2b-key-abc" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -42,7 +49,7 @@ describe("decideBuildInfra", () => {
     const pool = makeSequentialPool([
       { rows: [{ e2b_api_key: "user-e2b-key-abc" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     await router.decideBuildInfra("agent-1");
 
@@ -56,7 +63,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ total_seconds: "0" }] },            // total pool usage
       { rows: [{ count: "0" }] },                    // active sandbox count
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -70,7 +77,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ total_seconds: "3600" }] },         // 1 hour used, limit is 100
       { rows: [{ count: "2" }] },                    // 2 active, limit is 5
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -82,7 +89,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ e2b_api_key: null }] },
       { rows: [{ build_count: 5 }] },               // exactly at the limit
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -94,7 +101,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ e2b_api_key: null }] },
       { rows: [{ build_count: 99 }] },              // well over the limit
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -108,7 +115,7 @@ describe("decideBuildInfra", () => {
       { rows: [] },                                   // no agent usage yet
       { rows: [{ total_seconds: "360000" }] },       // exactly at the limit
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -121,7 +128,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ build_count: 0 }] },
       { rows: [{ total_seconds: "999999" }] },       // far over limit
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -136,7 +143,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ count: "5" }] },                    // exactly at concurrent limit
       { rows: [{ count: "3" }] },                    // 3 pending builds → position 3
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -151,7 +158,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ count: "10" }] },                   // over concurrent limit
       { rows: [{ count: "0" }] },                    // no pending builds
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -165,7 +172,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ total_seconds: "0" }] },
       { rows: [{ count: "0" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-orphan");
 
@@ -179,7 +186,7 @@ describe("decideBuildInfra", () => {
       { rows: [{ total_seconds: "0" }] },            // COALESCE returns 0
       { rows: [{ count: "0" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideBuildInfra("agent-1");
 
@@ -192,7 +199,7 @@ describe("decideDeployInfra", () => {
     const pool = makeSequentialPool([
       { rows: [{ fly_api_token: "user-fly-token-xyz" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideDeployInfra("agent-1");
 
@@ -208,7 +215,7 @@ describe("decideDeployInfra", () => {
       { rows: [{ fly_api_token: null }] },
       { rows: [{ count: "9" }] },                    // 9 deployed, limit is 10
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideDeployInfra("agent-1");
 
@@ -220,7 +227,7 @@ describe("decideDeployInfra", () => {
       { rows: [{ fly_api_token: null }] },
       { rows: [{ count: "10" }] },                   // exactly at the limit
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideDeployInfra("agent-1");
 
@@ -232,7 +239,7 @@ describe("decideDeployInfra", () => {
       { rows: [{ fly_api_token: null }] },
       { rows: [{ count: "25" }] },                   // well over limit
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideDeployInfra("agent-1");
 
@@ -243,7 +250,7 @@ describe("decideDeployInfra", () => {
     const pool = makeSequentialPool([
       { rows: [{ fly_api_token: "user-fly-token-xyz" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     await router.decideDeployInfra("agent-1");
 
@@ -255,7 +262,7 @@ describe("decideDeployInfra", () => {
       { rows: [] },                                   // no user found
       { rows: [{ count: "0" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const decision = await router.decideDeployInfra("agent-orphan");
 
@@ -266,7 +273,7 @@ describe("decideDeployInfra", () => {
 describe("recordUsage", () => {
   test("inserts new row for first usage of the day", async () => {
     const pool = makeSequentialPool([{ rows: [] }]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     await router.recordUsage("agent-1", 300);
 
@@ -279,7 +286,7 @@ describe("recordUsage", () => {
 
   test("uses UPSERT — ON CONFLICT DO UPDATE for subsequent calls", async () => {
     const pool = makeSequentialPool([{ rows: [] }, { rows: [] }]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     await router.recordUsage("agent-1", 120);
     await router.recordUsage("agent-1", 240);
@@ -294,7 +301,7 @@ describe("recordUsage", () => {
 
   test("passes agentId and sandboxSeconds as query parameters", async () => {
     const pool = makeSequentialPool([{ rows: [] }]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     await router.recordUsage("agent-xyz", 7200);
 
@@ -313,7 +320,7 @@ describe("getStatus", () => {
       { rows: [{ count: "2" }] },                    // 2 active sandboxes
       { rows: [{ count: "3" }] },                    // 3 deployed apps
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const status = await router.getStatus();
 
@@ -332,7 +339,7 @@ describe("getStatus", () => {
       { rows: [{ count: "5" }] },
       { rows: [{ count: "10" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const status = await router.getStatus();
 
@@ -345,7 +352,7 @@ describe("getStatus", () => {
       { rows: [{ count: "0" }] },
       { rows: [{ count: "0" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const status = await router.getStatus();
 
@@ -358,7 +365,7 @@ describe("getStatus", () => {
       { rows: [{ count: "4" }] },
       { rows: [{ count: "0" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const status = await router.getStatus();
 
@@ -371,7 +378,7 @@ describe("getStatus", () => {
       { rows: [{ count: "0" }] },
       { rows: [{ count: "0" }] },
     ]);
-    const router = new InfraRouter(pool, TEST_CONFIG);
+    const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
     const status = await router.getStatus();
 
@@ -392,7 +399,7 @@ describe("getStatus", () => {
       { rows: [{ count: "0" }] },
       { rows: [{ count: "0" }] },
     ]);
-    const router = new InfraRouter(pool, customConfig);
+    const router = new InfraRouter(pool, customConfig, identityCipher);
 
     const status = await router.getStatus();
 
