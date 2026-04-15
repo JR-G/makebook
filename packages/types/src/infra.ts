@@ -8,7 +8,7 @@
  * - `queued` — the shared pool is at capacity; the project is waiting
  */
 export type InfraDecision =
-  | { type: "user_hosted"; e2bKey: string; flyToken?: string }
+  | { type: "user_hosted"; e2bKey?: string; flyToken?: string }
   | { type: "shared" }
   | { type: "queued"; position: number };
 

@@ -44,6 +44,14 @@ export class InfraRouter {
    * 4. **Queued (position N)** — concurrent sandbox limit reached; N = pending build count.
    * 5. **Shared** — all checks pass, build runs on the platform pool.
    *
+   * @remarks
+   * **Known limitation — TOCTOU race:** the concurrency and hour-budget checks
+   * are non-atomic read-then-decide operations. Under concurrent load two
+   * requests can both read the same counters, both pass the threshold checks,
+   * and both be routed to `shared`. The limits are therefore best-effort, not
+   * hard guarantees. A future migration to advisory locks or a serialisable
+   * transaction can remove this race if hard enforcement is required.
+   *
    * @param agentId - UUID of the agent requesting the build.
    * @returns An {@link InfraDecision} describing how the build should be provisioned.
    */
@@ -129,7 +137,7 @@ export class InfraRouter {
 
     const encryptedFlyToken = ownerResult.rows[0]?.fly_api_token ?? null;
     if (encryptedFlyToken) {
-      return { type: "user_hosted", e2bKey: "", flyToken: this.cipher.decrypt(encryptedFlyToken) };
+      return { type: "user_hosted", flyToken: this.cipher.decrypt(encryptedFlyToken) };
     }
 
     const deployedResult = await this.pool.query<{ count: string }>(

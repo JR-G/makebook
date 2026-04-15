@@ -33,6 +33,25 @@ function makeSequentialPool(responses: { rows: unknown[] }[]): Pool {
   } as unknown as Pool;
 }
 
+/**
+ * Creates a mock Pool that dispatches responses based on a substring match
+ * against the SQL string. Order-independent — safe for Promise.all queries.
+ *
+ * Each handler must supply a unique `match` fragment from its SQL statement.
+ * The first matching handler wins; unmatched queries return empty rows.
+ */
+function makeContentAwarePool(
+  handlers: { match: string; rows: unknown[] }[],
+): Pool {
+  return {
+    query: mock((sql: string) => {
+      const handler = handlers.find((handler) => sql.includes(handler.match));
+      const rows = handler?.rows ?? [];
+      return Promise.resolve({ rows, rowCount: rows.length });
+    }),
+  } as unknown as Pool;
+}
+
 describe("decideBuildInfra", () => {
   test("returns user_hosted when agent's owner has e2b_api_key", async () => {
     const pool = makeSequentialPool([
@@ -205,7 +224,6 @@ describe("decideDeployInfra", () => {
 
     expect(decision).toEqual({
       type: "user_hosted",
-      e2bKey: "",
       flyToken: "user-fly-token-xyz",
     });
   });
@@ -313,12 +331,10 @@ describe("recordUsage", () => {
 
 describe("getStatus", () => {
   test("returns correct remaining hours based on config limit minus usage", async () => {
-    // getStatus fires 3 concurrent queries via Promise.all in this order:
-    // 1. total_seconds, 2. active count, 3. deployed count
-    const pool = makeSequentialPool([
-      { rows: [{ total_seconds: "36000" }] },        // 10 hours used
-      { rows: [{ count: "2" }] },                    // 2 active sandboxes
-      { rows: [{ count: "3" }] },                    // 3 deployed apps
+    const pool = makeContentAwarePool([
+      { match: "sandbox_seconds", rows: [{ total_seconds: "36000" }] },
+      { match: "contributions", rows: [{ count: "2" }] },
+      { match: "projects", rows: [{ count: "3" }] },
     ]);
     const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
@@ -334,10 +350,10 @@ describe("getStatus", () => {
   });
 
   test("returns zero remaining when fully exhausted", async () => {
-    const pool = makeSequentialPool([
-      { rows: [{ total_seconds: "360000" }] },       // 100 hours — exactly at limit
-      { rows: [{ count: "5" }] },
-      { rows: [{ count: "10" }] },
+    const pool = makeContentAwarePool([
+      { match: "sandbox_seconds", rows: [{ total_seconds: "360000" }] }, // 100 hours — exactly at limit
+      { match: "contributions", rows: [{ count: "5" }] },
+      { match: "projects", rows: [{ count: "10" }] },
     ]);
     const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
@@ -347,10 +363,10 @@ describe("getStatus", () => {
   });
 
   test("clamps remaining to zero when usage exceeds configured limit", async () => {
-    const pool = makeSequentialPool([
-      { rows: [{ total_seconds: "999999" }] },       // far over limit
-      { rows: [{ count: "0" }] },
-      { rows: [{ count: "0" }] },
+    const pool = makeContentAwarePool([
+      { match: "sandbox_seconds", rows: [{ total_seconds: "999999" }] }, // far over limit
+      { match: "contributions", rows: [{ count: "0" }] },
+      { match: "projects", rows: [{ count: "0" }] },
     ]);
     const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
@@ -360,10 +376,10 @@ describe("getStatus", () => {
   });
 
   test("returns correct active sandbox count", async () => {
-    const pool = makeSequentialPool([
-      { rows: [{ total_seconds: "0" }] },
-      { rows: [{ count: "4" }] },
-      { rows: [{ count: "0" }] },
+    const pool = makeContentAwarePool([
+      { match: "sandbox_seconds", rows: [{ total_seconds: "0" }] },
+      { match: "contributions", rows: [{ count: "4" }] },
+      { match: "projects", rows: [{ count: "0" }] },
     ]);
     const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
@@ -373,10 +389,10 @@ describe("getStatus", () => {
   });
 
   test("returns zeroed status for a fresh day with no usage", async () => {
-    const pool = makeSequentialPool([
-      { rows: [{ total_seconds: "0" }] },            // COALESCE returns '0'
-      { rows: [{ count: "0" }] },
-      { rows: [{ count: "0" }] },
+    const pool = makeContentAwarePool([
+      { match: "sandbox_seconds", rows: [{ total_seconds: "0" }] },
+      { match: "contributions", rows: [{ count: "0" }] },
+      { match: "projects", rows: [{ count: "0" }] },
     ]);
     const router = new InfraRouter(pool, TEST_CONFIG, identityCipher);
 
@@ -394,10 +410,10 @@ describe("getStatus", () => {
       sharedPoolMaxConcurrent: 20,
       sharedPoolMaxDeployed: 50,
     };
-    const pool = makeSequentialPool([
-      { rows: [{ total_seconds: "0" }] },
-      { rows: [{ count: "0" }] },
-      { rows: [{ count: "0" }] },
+    const pool = makeContentAwarePool([
+      { match: "sandbox_seconds", rows: [{ total_seconds: "0" }] },
+      { match: "contributions", rows: [{ count: "0" }] },
+      { match: "projects", rows: [{ count: "0" }] },
     ]);
     const router = new InfraRouter(pool, customConfig, identityCipher);
 
