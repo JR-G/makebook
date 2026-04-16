@@ -1,8 +1,8 @@
 import type { Pool } from "pg";
-import type { InfraDecision, SharedPoolStatus } from "@makebook/types";
+import type { BuildInfraDecision, DeployInfraDecision, SharedPoolStatus } from "@makebook/types";
 import type { CredentialCipher } from "./credential-cipher.ts";
 
-/** Configuration for shared-pool limits and platform-level credentials. */
+/** Configuration for shared-pool limits. */
 export interface InfraConfig {
   /** Maximum cumulative sandbox-hours allowed across all agents per day. */
   sharedPoolMaxSandboxHours: number;
@@ -12,8 +12,62 @@ export interface InfraConfig {
   sharedPoolMaxDeployed: number;
   /** Maximum number of builds a single agent may trigger per day on the shared pool. */
   sharedPoolMaxBuildsPerAgent: number;
-  /** Platform-level E2B API key used when no per-user key is present. */
-  e2bApiKey: string;
+}
+
+/**
+ * Provides live counts from build and deploy domains without `InfraRouter`
+ * coupling directly to those tables.
+ *
+ * Implement this interface in the build/deploy services and inject it into
+ * {@link InfraRouter}. The default {@link PostgresPoolMetricsProvider} queries
+ * `contributions` and `projects` directly — useful for bootstrapping before
+ * dedicated services exist.
+ */
+export interface PoolMetricsProvider {
+  /** Returns the number of sandboxes currently in the `building` state. */
+  getActiveSandboxCount(): Promise<number>;
+  /** Returns the number of builds currently in the `pending` state. */
+  getPendingSandboxCount(): Promise<number>;
+  /** Returns the number of apps currently in the `deployed` state. */
+  getDeployedAppCount(): Promise<number>;
+}
+
+/**
+ * Default implementation of {@link PoolMetricsProvider} backed by direct SQL.
+ *
+ * Queries `contributions` and `projects` tables owned by the build/deploy
+ * domains. Swap this out for a service-owned implementation as those domains
+ * mature to keep dependency direction clean.
+ */
+export class PostgresPoolMetricsProvider implements PoolMetricsProvider {
+  constructor(private readonly pool: Pool) {}
+
+  async getActiveSandboxCount(): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM contributions
+       WHERE status = 'building'`,
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async getPendingSandboxCount(): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM contributions
+       WHERE status = 'pending'`,
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async getDeployedAppCount(): Promise<number> {
+    const result = await this.pool.query<{ count: string }>(
+      `SELECT COUNT(*) AS count
+       FROM projects
+       WHERE deploy_url IS NOT NULL AND status = 'deployed'`,
+    );
+    return Number(result.rows[0]?.count ?? 0);
+  }
 }
 
 /**
@@ -32,6 +86,7 @@ export class InfraRouter {
     private readonly pool: Pool,
     private readonly config: InfraConfig,
     private readonly cipher: CredentialCipher,
+    private readonly metrics: PoolMetricsProvider,
   ) {}
 
   /**
@@ -53,9 +108,9 @@ export class InfraRouter {
    * transaction can remove this race if hard enforcement is required.
    *
    * @param agentId - UUID of the agent requesting the build.
-   * @returns An {@link InfraDecision} describing how the build should be provisioned.
+   * @returns A {@link BuildInfraDecision} describing how the build should be provisioned.
    */
-  async decideBuildInfra(agentId: string): Promise<InfraDecision> {
+  async decideBuildInfra(agentId: string): Promise<BuildInfraDecision> {
     const ownerResult = await this.pool.query<{ e2b_api_key: string | null }>(
       `SELECT u.e2b_api_key
        FROM agents a
@@ -94,20 +149,9 @@ export class InfraRouter {
       return { type: "queued", position: 0 };
     }
 
-    const activeResult = await this.pool.query<{ count: string }>(
-      `SELECT COUNT(*) AS count
-       FROM contributions
-       WHERE status = 'building'`,
-    );
-
-    const activeCount = Number(activeResult.rows[0]?.count ?? 0);
+    const activeCount = await this.metrics.getActiveSandboxCount();
     if (activeCount >= this.config.sharedPoolMaxConcurrent) {
-      const pendingResult = await this.pool.query<{ count: string }>(
-        `SELECT COUNT(*) AS count
-         FROM contributions
-         WHERE status = 'pending'`,
-      );
-      const pendingCount = Number(pendingResult.rows[0]?.count ?? 0);
+      const pendingCount = await this.metrics.getPendingSandboxCount();
       return { type: "queued", position: pendingCount };
     }
 
@@ -123,9 +167,9 @@ export class InfraRouter {
    * 3. **Shared** — deployment runs on the platform pool.
    *
    * @param agentId - UUID of the agent requesting the deployment.
-   * @returns An {@link InfraDecision} describing how the deployment should be provisioned.
+   * @returns A {@link DeployInfraDecision} describing how the deployment should be provisioned.
    */
-  async decideDeployInfra(agentId: string): Promise<InfraDecision> {
+  async decideDeployInfra(agentId: string): Promise<DeployInfraDecision> {
     const ownerResult = await this.pool.query<{ fly_api_token: string | null }>(
       `SELECT u.fly_api_token
        FROM agents a
@@ -140,13 +184,7 @@ export class InfraRouter {
       return { type: "user_hosted", flyToken: this.cipher.decrypt(encryptedFlyToken) };
     }
 
-    const deployedResult = await this.pool.query<{ count: string }>(
-      `SELECT COUNT(*) AS count
-       FROM projects
-       WHERE deploy_url IS NOT NULL AND status = 'deployed'`,
-    );
-
-    const deployedCount = Number(deployedResult.rows[0]?.count ?? 0);
+    const deployedCount = await this.metrics.getDeployedAppCount();
     if (deployedCount >= this.config.sharedPoolMaxDeployed) {
       return { type: "queued", position: 0 };
     }
@@ -177,34 +215,25 @@ export class InfraRouter {
   /**
    * Returns a snapshot of the shared pool's current utilisation.
    *
-   * Queries today's cumulative sandbox seconds, the number of actively running
-   * sandboxes, and the number of deployed apps, then calculates derived fields
-   * against the configured limits.
+   * Queries today's cumulative sandbox seconds and calculates derived fields
+   * against the configured limits. Live sandbox and deployment counts are
+   * obtained from the injected {@link PoolMetricsProvider}.
    *
    * @returns A {@link SharedPoolStatus} with all fields populated.
    */
   async getStatus(): Promise<SharedPoolStatus> {
-    const [usageResult, activeResult, deployedResult] = await Promise.all([
-      this.pool.query<{ total_seconds: string }>(
-        `SELECT COALESCE(SUM(sandbox_seconds), 0) AS total_seconds
-         FROM shared_pool_usage
-         WHERE date = CURRENT_DATE`,
-      ),
-      this.pool.query<{ count: string }>(
-        `SELECT COUNT(*) AS count
-         FROM contributions
-         WHERE status = 'building'`,
-      ),
-      this.pool.query<{ count: string }>(
-        `SELECT COUNT(*) AS count
-         FROM projects
-         WHERE deploy_url IS NOT NULL AND status = 'deployed'`,
-      ),
+    const usageResult = await this.pool.query<{ total_seconds: string }>(
+      `SELECT COALESCE(SUM(sandbox_seconds), 0) AS total_seconds
+       FROM shared_pool_usage
+       WHERE date = CURRENT_DATE`,
+    );
+
+    const [activeSandboxes, deployedApps] = await Promise.all([
+      this.metrics.getActiveSandboxCount(),
+      this.metrics.getDeployedAppCount(),
     ]);
 
     const totalSeconds = Number(usageResult.rows[0]?.total_seconds ?? 0);
-    const activeSandboxes = Number(activeResult.rows[0]?.count ?? 0);
-    const deployedApps = Number(deployedResult.rows[0]?.count ?? 0);
     const sandboxHoursUsedToday = totalSeconds / 3600;
     const sandboxHoursLimitToday = this.config.sharedPoolMaxSandboxHours;
 

@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS shared_pool_usage (
   date DATE NOT NULL,
-  agent_id UUID NOT NULL REFERENCES agents(id),
+  agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
   sandbox_seconds BIGINT NOT NULL DEFAULT 0,
   build_count INT NOT NULL DEFAULT 0,
   PRIMARY KEY (date, agent_id)

@@ -1,16 +1,34 @@
 /** Infrastructure domain types for the MakeBook platform. */
 
 /**
- * A discriminated union describing how a project's sandbox will be provisioned.
+ * A discriminated union describing how a build should be provisioned.
  *
- * - `user_hosted` — the agent's owner has provided their own E2B and/or Fly credentials
- * - `shared` — the project runs on the platform's shared sandbox pool
- * - `queued` — the shared pool is at capacity; the project is waiting
+ * - `user_hosted` — the agent's owner has their own E2B API key
+ * - `shared` — the build runs on the platform's shared sandbox pool
+ * - `queued` — the shared pool is at capacity; the build is waiting
  */
-export type InfraDecision =
-  | { type: "user_hosted"; e2bKey?: string; flyToken?: string }
+export type BuildInfraDecision =
+  | { type: "user_hosted"; e2bKey: string }
   | { type: "shared" }
   | { type: "queued"; position: number };
+
+/**
+ * A discriminated union describing how a deployment should be provisioned.
+ *
+ * - `user_hosted` — the agent's owner has their own Fly.io API token
+ * - `shared` — the deployment runs on the platform's shared pool
+ * - `queued` — the shared pool is at capacity; the deployment is waiting
+ */
+export type DeployInfraDecision =
+  | { type: "user_hosted"; flyToken: string }
+  | { type: "shared" }
+  | { type: "queued"; position: number };
+
+/**
+ * Union of all infra decision types. Use {@link BuildInfraDecision} or
+ * {@link DeployInfraDecision} for context-specific type safety.
+ */
+export type InfraDecision = BuildInfraDecision | DeployInfraDecision;
 
 /**
  * Current utilisation snapshot of the platform's shared sandbox pool.

@@ -58,6 +58,13 @@ export class AesGcmCipher implements CredentialCipher {
     const encrypted = data.subarray(AesGcmCipher.IV_BYTES + AesGcmCipher.TAG_BYTES);
     const decipher = createDecipheriv(AesGcmCipher.ALGORITHM, this.key, iv);
     decipher.setAuthTag(authTag);
-    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+    try {
+      return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+    } catch (cause) {
+      throw new Error(
+        "AesGcmCipher.decrypt: authentication tag verification failed — ciphertext may be tampered or the wrong key was used",
+        { cause },
+      );
+    }
   }
 }

@@ -36,7 +36,7 @@ export type {
 } from "./activity.ts";
 export { isActivityType } from "./activity.ts";
 
-export type { InfraDecision, SharedPoolStatus } from "./infra.ts";
+export type { BuildInfraDecision, DeployInfraDecision, InfraDecision, SharedPoolStatus } from "./infra.ts";
 export {
   isInfraUserHosted,
   isInfraShared,

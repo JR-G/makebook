@@ -74,10 +74,9 @@ describe("isInfraUserHosted", () => {
     expect(isInfraUserHosted(decision)).toBe(true);
   });
 
-  it("returns true for user_hosted decisions with optional flyToken", () => {
+  it("returns true for user_hosted deploy decisions with flyToken", () => {
     const decision: InfraDecision = {
       type: "user_hosted",
-      e2bKey: "key123",
       flyToken: "fly_token",
     };
     expect(isInfraUserHosted(decision)).toBe(true);
